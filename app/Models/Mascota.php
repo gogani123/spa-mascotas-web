@@ -12,15 +12,16 @@ class Mascota extends Model
 
     // Campos que permitimos llenar desde un formulario
     protected $fillable = [
-        'user_id',
         'nombre',
         'especie',
         'raza',
-        'tamano',
-        'fecha_nacimiento',
+        'fecha_nacimiento', 
+        'temperamento',     // <- LO DEVOLVEMOS PARA QUE LA BASE DE DATOS NO SE ENOJE
         'alergias',
-        'temperamento',
         'carnet_vacunas',
+        'user_id',
+        'tamano',           
+        'comportamiento',   
     ];
 
     // Relación: Una mascota pertenece a un dueño (Usuario)

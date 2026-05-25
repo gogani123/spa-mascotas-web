@@ -24,7 +24,7 @@
                             
                             <div>
                                 <label class="block text-sm font-medium text-gray-400">Nombre de la Mascota *</label>
-                                <input type="text" name="nombre" class="w-full mt-1 bg-gray-900 border-gray-700 text-white focus:ring-indigo-500 focus:border-indigo-500 rounded-md shadow-sm" placeholder="Ej: Firulais" required>
+                                <input type="text" name="nombre" class="w-full mt-1 bg-gray-900 border-gray-700 text-white focus:ring-indigo-500 focus:border-indigo-500 rounded-md shadow-sm" required>
                             </div>
 
                             <div class="grid grid-cols-2 gap-4">
@@ -39,7 +39,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-400">Raza (Opcional)</label>
-                                    <input type="text" name="raza" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ej: Golden Retriever">
+                                    <input type="text" name="raza" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
                                 </div>
                             </div>
 
@@ -48,10 +48,10 @@
                                     <label class="block text-sm font-medium text-gray-400">Tamaño *</label>
                                     <select name="tamano" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
                                         <option value="" disabled selected>Selecciona...</option>
-                                        <option value="Pequeño">Pequeño</option>
-                                        <option value="Mediano">Mediano</option>
-                                        <option value="Grande">Grande</option>
-                                        <option value="Gigante">Gigante</option>
+                                        <option value="Pequeña">Pequeña</option>
+                                        <option value="Mediana">Mediana (+10% tiempo)</option>
+                                        <option value="Grande">Grande (+15% tiempo)</option>
+                                        <option value="Gigante">Gigante / Raza Compleja (+30% tiempo)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -65,19 +65,18 @@
                             <h4 class="text-lg font-bold text-gray-300 border-b border-gray-700 pb-2">Salud y Comportamiento</h4>
                             
                             <div>
-                                <label class="block text-sm font-medium text-gray-400">Temperamento *</label>
-                                <select name="temperamento" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                                <label class="block text-sm font-medium text-gray-400">Comportamiento *</label>
+                                <select name="comportamiento" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
                                     <option value="" disabled selected>¿Cómo se comporta normalmente?</option>
-                                    <option value="Tranquilo">Tranquilo / Dócil</option>
-                                    <option value="Nervioso">Nervioso / Asustadizo</option>
-                                    <option value="Inquieto">Inquieto / Juguetón</option>
-                                    <option value="Agresivo">Agresivo / Reactivo</option>
+                                    <option value="Normal">Tranquilo / Normal</option>
+                                    <option value="Nerviosa">Nervioso / Asustadizo (+20 min extra)</option>
+                                    <option value="Agresiva">Agresivo / Reactivo (+20 min extra)</option>
                                 </select>
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-400">Alergias o condiciones médicas (Opcional)</label>
-                                <textarea name="alergias" rows="2" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ej: Alérgico al shampoo de avena..."></textarea>
+                                <label class="block text-sm font-medium text-gray-400">Alergias o médicas (Opcional)</label>
+                                <textarea name="alergias" rows="2" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></textarea>
                             </div>
 
                             <div>
@@ -89,7 +88,7 @@
                     </div>
 
                     <div class="mt-10 flex justify-end">
-                        <button type="submit" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-md shadow-lg transition duration-150 ease-in-out transform hover:scale-105">
+                        <button type="submit" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-md shadow-lg transition transform hover:scale-105">
                             REGISTRAR MASCOTA
                         </button>
                     </div>
