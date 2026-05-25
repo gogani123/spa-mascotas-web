@@ -11,72 +11,80 @@
                 <form method="POST" action="{{ route('admin.users.store') }}">
                     @csrf
                     
-                    <<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    
-    <div class="space-y-4">
-        <h3 class="text-lg font-bold text-indigo-500 border-b border-gray-700 pb-2">Datos Personales y de Acceso</h3>
-        
-        <div>
-            <label class="block text-sm font-medium text-gray-300">Nombre Completo</label>
-            <input type="text" name="name" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md" required>
-        </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-bold text-indigo-500 border-b border-gray-700 pb-2">Datos Personales y de Acceso</h3>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300">Nombre Completo</label>
+                                <input type="text" name="name" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md" required>
+                            </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-300">Carnet de Identidad (CI)</label>
-            <input type="text" name="ci" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md" placeholder="Ej: 1234567" required>
-        </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300">Carnet de Identidad (CI)</label>
+                                <input type="text" name="ci" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md" placeholder="Ej: 1234567" required>
+                            </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-300">Correo Institucional</label>
-            <input type="email" name="email" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md" required>
-        </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300">Correo Institucional</label>
+                                <input type="email" name="email" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md" required>
+                            </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-300">Contraseña Temporal</label>
-            <div class="relative mt-1">
-                <input id="password" type="password" name="password" class="w-full bg-gray-900 border-gray-700 text-white rounded-md pr-10" required>
-                <button type="button" onclick="togglePassword('password', 'eye-icon-temp')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white focus:outline-none">
-                    <svg id="eye-icon-temp" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-    </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300">Contraseña Temporal</label>
+                                <div class="relative mt-1">
+                                    <input id="password" type="password" name="password" class="w-full bg-gray-900 border-gray-700 text-white rounded-md pr-10" required>
+                                    <button type="button" onclick="togglePassword('password', 'eye-icon-temp')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white focus:outline-none">
+                                        <svg id="eye-icon-temp" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
 
-    <div class="space-y-4">
-        <h3 class="text-lg font-bold text-indigo-500 border-b border-gray-700 pb-2">Información Laboral y Contacto</h3>
-        
-        <div>
-            <label class="block text-sm font-medium text-gray-300">Teléfono / Celular</label>
-            <input type="text" name="telefono" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md" placeholder="Ej: 77777777" required>
-        </div>
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-bold text-indigo-500 border-b border-gray-700 pb-2">Información Laboral y Contacto</h3>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300">Teléfono / Celular</label>
+                                <input type="text" name="telefono" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md" placeholder="Ej: 77777777" required>
+                            </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-300">Puesto / Rol</label>
-            <select name="rol_id" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md">
-                @foreach($roles as $rol)
-                    <option value="{{ $rol->id }}">{{ $rol->nombre }}</option>
-                @endforeach
-            </select>
-        </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300">Puesto / Rol</label>
+                                <select name="rol_id" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md">
+                                    @foreach($roles as $rol)
+                                        <option value="{{ $rol->id }}">{{ $rol->nombre }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-300">Especialidad (Si es Groomer)</label>
-            <input type="text" name="especialidad" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md" placeholder="Ej: Cortes de raza, Tintura">
-        </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300">Especialidad (Si es Groomer)</label>
+                                <input type="text" name="especialidad" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md" placeholder="Ej: Cortes de raza, Tintura">
+                            </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-300">Turno Asignado</label>
-            <select name="turno" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md">
-                <option value="Mañana">Mañana (08:00 - 12:00)</option>
-                <option value="Tarde">Tarde (14:00 - 18:00)</option>
-                <option value="Completo">Tiempo Completo</option>
-            </select>
-        </div>
-    </div>
-</div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300">Turno Asignado</label>
+                                    <select name="turno" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md">
+                                        <option value="Mañana">Mañana</option>
+                                        <option value="Tarde">Tarde</option>
+                                        <option value="Completo">Completo</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300">Capacidad Diaria *</label>
+                                    <input type="number" name="capacidad_diaria" min="1" max="50" value="10" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md" title="Mascotas máximas por día" required>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
 
                     <div class="mt-8 flex justify-end">
                         <button type="submit" class="px-10 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-md shadow-lg transition">

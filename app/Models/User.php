@@ -32,6 +32,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'direccion',
         'especialidad',
         'turno',
+        'capacidad_diaria',
     ];
 
     /**
@@ -55,5 +56,12 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+    /**
+     * Relación: Un Usuario (Dueño) tiene muchas Mascotas
+     */
+    public function mascotas()
+    {
+        return $this->hasMany(Mascota::class);
     }
 }

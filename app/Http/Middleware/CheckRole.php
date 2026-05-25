@@ -5,17 +5,28 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Support\Facades\Auth;
 
 class CheckRole
 {
-    public function handle(Request $request, Closure $next, $role): Response
+    /**
+     * Handle an incoming request.
+     *
+     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  mixed  ...$roles (Permite recibir varios roles separados por coma)
+     */
+    public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        // Verificamos si tiene sesión activa y si su rol_id coincide con el exigido
-        if (!Auth::check() || Auth::user()->rol_id != $role) {
-            return redirect('/dashboard'); // Lo expulsamos si intenta entrar a la fuerza
+        // Si el usuario no ha iniciado sesión, lo mandamos al login
+        if (!$request->user()) {
+            return redirect('login');
         }
 
-        return $next($request);
+        // Si el rol_id del usuario actual ESTÁ dentro de la lista permitida (ej: 1 y 2), pasa.
+        if (in_array($request->user()->rol_id, $roles)) {
+            return $next($request);
+        }
+
+        // Si no está en la lista, le denegamos el acceso (Error 403)
+        abort(403, 'No tienes permisos para acceder a esta sección del sistema.');
     }
 }

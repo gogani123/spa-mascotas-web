@@ -31,8 +31,9 @@ class UserController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'rol_id' => 'required|exists:roles,id',
-            'ci' => 'required|string|max:20',        // Validar el CI
-            'telefono' => 'required|string|max:20',  // Validar el Teléfono
+            'ci' => 'required|string|max:8',        
+            'telefono' => 'required|string|max:8',  
+            'capacidad_diaria' => 'required|integer|min:1|max:50',
         ]);
 
         // 2. Guardamos al usuario en la base de datos
@@ -41,11 +42,12 @@ class UserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'rol_id' => $request->rol_id,
-            'ci' => $request->ci,                    // Guardar el CI
-            'telefono' => $request->telefono,        // Guardar el Teléfono
+            'ci' => $request->ci,                    
+            'telefono' => $request->telefono,        
             'especialidad' => $request->especialidad,
             'turno' => $request->turno,
             'estado' => true,
+            'capacidad_diaria' => $request->capacidad_diaria,
             'email_verified_at' => now(),
         ]);
         
