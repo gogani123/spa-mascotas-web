@@ -114,6 +114,8 @@ class CitaController extends Controller
             return back()->withErrors(['error' => 'No hay groomers disponibles en ese horario. Existe un solapamiento de citas. Elige otra hora.']);
         }
 
+        // Si el cliente agenda (Rol 4), la cita entra como Pendiente. Si es Admin/Recepción, entra Confirmada.
+        $estado_inicial = (Auth::user()->rol_id == 4) ? 'Pendiente' : 'Confirmada';
         // LA SEGUNDA CORRECCIÓN: Guardamos al dueño real (mascota->user_id), sin importar quién esté frente a la pantalla
         Cita::create([
             'cliente_id' => $mascota->user_id, 
@@ -123,7 +125,7 @@ class CitaController extends Controller
             'fecha' => $request->fecha,
             'hora_inicio' => $hora_inicio->format('H:i'),
             'hora_fin' => $hora_fin->format('H:i'),
-            'estado' => 'Confirmada',
+            'estado' => $estado_inicial,
         ]);
 
         return redirect()->back()->with('success', '¡Cita agendada! El sistema calculó '. $duracion_final .' minutos en total por las características de la mascota.');
@@ -221,5 +223,16 @@ class CitaController extends Controller
         ]);
 
         return response()->json(['success' => true]);
+    }
+    // Función para aprobar citas pendientes (Punto 3.2)
+    public function aprobar(Cita $cita)
+    {
+        // SEGURIDAD: Si es Cliente (Rol 4), bloqueamos la acción y lo sacamos.
+        if (Auth::user()->rol_id == 4) {
+            return redirect()->back()->withErrors(['error' => 'Acceso denegado. Solo Recepción puede aprobar citas.']);
+        }
+
+        $cita->update(['estado' => 'Confirmada']);
+        return redirect()->back()->with('success', '¡Cita de ' . $cita->mascota->nombre . ' aprobada correctamente!');
     }
 }

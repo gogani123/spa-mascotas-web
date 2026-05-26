@@ -28,6 +28,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('mascotas', MascotaController::class);
     Route::resource('citas', CitaController::class);
     Route::get('/citas/{cita}/cobrar', [App\Http\Controllers\CitaController::class, 'cobrar'])->name('citas.cobrar');
+    Route::post('/citas/{cita}/aprobar', [App\Http\Controllers\CitaController::class, 'aprobar'])->name('citas.aprobar');
     Route::post('/citas/{cita}/pagar', [App\Http\Controllers\CitaController::class, 'pagar'])->name('citas.pagar');
     Route::get('/calendario-interactivo', [App\Http\Controllers\CitaController::class, 'calendario'])->name('citas.calendario');
     Route::get('/api/citas-eventos', [App\Http\Controllers\CitaController::class, 'apiEventos']);
