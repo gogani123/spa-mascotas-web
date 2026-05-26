@@ -27,6 +27,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::resource('mascotas', MascotaController::class);
     Route::resource('citas', CitaController::class);
+    Route::get('/citas/{cita}/cobrar', [App\Http\Controllers\CitaController::class, 'cobrar'])->name('citas.cobrar');
+    Route::post('/citas/{cita}/pagar', [App\Http\Controllers\CitaController::class, 'pagar'])->name('citas.pagar');
+    Route::get('/calendario-interactivo', [App\Http\Controllers\CitaController::class, 'calendario'])->name('citas.calendario');
+    Route::get('/api/citas-eventos', [App\Http\Controllers\CitaController::class, 'apiEventos']);
+    Route::post('/api/citas-mover/{id}', [App\Http\Controllers\CitaController::class, 'apiMover']);
 });
 
 // Rutas del 2FA (Seguridad de Administrador)

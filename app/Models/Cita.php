@@ -9,9 +9,6 @@ class Cita extends Model
 {
     use HasFactory;
 
-    protected $table = 'citas';
-
-    // Habilitamos los campos que se pueden guardar
     protected $fillable = [
         'cliente_id',
         'mascota_id',
@@ -21,27 +18,29 @@ class Cita extends Model
         'hora_inicio',
         'hora_fin',
         'estado',
+        'estado_pago',
+        'metodo_pago',
     ];
 
-    // ==========================================================
-    // RELACIONES: Esto permite que el sistema sepa quién es quién
-    // ==========================================================
-    
+    // Relación: Una cita pertenece a un Cliente (Usuario)
     public function cliente()
     {
         return $this->belongsTo(User::class, 'cliente_id');
     }
 
+    // Relación: Una cita pertenece a una Mascota
     public function mascota()
     {
-        return $this->belongsTo(Mascota::class);
+        return $this->belongsTo(Mascota::class, 'mascota_id');
     }
 
+    // Relación: Una cita incluye un Servicio
     public function servicio()
     {
-        return $this->belongsTo(Servicio::class);
+        return $this->belongsTo(Servicio::class, 'servicio_id');
     }
 
+    // Relación: Una cita es atendida por un Groomer (Usuario)
     public function groomer()
     {
         return $this->belongsTo(User::class, 'groomer_id');

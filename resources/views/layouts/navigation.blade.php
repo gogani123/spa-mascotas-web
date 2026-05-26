@@ -12,37 +12,37 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+                    
                     <x-nav-link :href="route('mascotas.create')" :active="request()->routeIs('mascotas.*')">
                         {{ __('Registrar Mascota') }}
                     </x-nav-link>
-                    @if(Auth::user()->rol_id == 4 || Auth::user()->rol_id == 2)
-                        <x-nav-link :href="route('citas.create')" :active="request()->routeIs('citas.*')">
-                            {{ __('Agendar Cita') }}
-                        </x-nav-link>
-                    @endif
+                    
+                    <x-nav-link :href="route('citas.index')" :active="request()->routeIs('citas.index')">
+                        {{ __('Ver Citas') }}
+                    </x-nav-link>
+                    
+                    <x-nav-link :href="route('citas.create')" :active="request()->routeIs('citas.create')">
+                        {{ __('Agendar Cita') }}
+                    </x-nav-link>
+
                     @if(Auth::user()->rol_id == 1)
                         <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">
                             Gestión de Personal
                         </x-nav-link>
-                    @endif
-                    @if(Auth::user()->rol_id == 1)
                         <x-nav-link :href="route('admin.servicios.index')" :active="request()->routeIs('admin.servicios.*')">
                             {{ __('Catálogo de Servicios') }}
                         </x-nav-link>
+                        <x-nav-link :href="route('admin.auditoria.index')" :active="request()->routeIs('admin.auditoria.*')">
+                            {{ __('Auditoría de Sistema') }}
+                        </x-nav-link>
                     @endif
+
                     @if(Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2)
                         <x-nav-link :href="route('admin.bloqueos.index')" :active="request()->routeIs('admin.bloqueos.*')">
                             {{ __('Bloqueos de Agenda') }}
                         </x-nav-link>
-                    @endif
-                    @if(Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2)
                         <x-nav-link :href="route('admin.horarios.index')" :active="request()->routeIs('admin.horarios.*')">
                             {{ __('Horarios del Spa') }}
-                        </x-nav-link>
-                    @endif
-                    @if(Auth::user()->rol_id == 1)
-                        <x-nav-link :href="route('admin.auditoria.index')" :active="request()->routeIs('admin.auditoria.*')">
-                            {{ __('Auditoría de Sistema') }}
                         </x-nav-link>
                     @endif
                 </div>
