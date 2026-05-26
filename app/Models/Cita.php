@@ -20,6 +20,15 @@ class Cita extends Model
         'estado',
         'estado_pago',
         'metodo_pago',
+        'estado_inicial',
+        'checklist',
+        'insumos',
+        'foto_antes',
+        'foto_despues',
+    ];
+    protected $casts = [
+        'checklist' => 'array',
+        'insumos' => 'array',
     ];
 
     // Relación: Una cita pertenece a un Cliente (Usuario)

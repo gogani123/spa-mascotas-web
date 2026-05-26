@@ -63,14 +63,36 @@
                         </select>
                     </div>
 
+                    @if(Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2)
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Asignar Groomer (Peluquero) *</label>
+                            <select name="groomer_id" class="w-full bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                                <option value="" disabled selected>Selecciona al estilista encargado...</option>
+                                @foreach(\App\Models\User::where('rol_id', 3)->get() as $groomer)
+                                    <option value="{{ $groomer->id }}">✂️ {{ $groomer->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+
                     <div class="grid grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-300 mb-1">Fecha de la Cita *</label>
                             <input type="date" name="fecha" min="{{ date('Y-m-d') }}" class="w-full bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
                         </div>
+                        
                         <div>
                             <label class="block text-sm font-medium text-gray-300 mb-1">Hora de Inicio *</label>
-                            <input type="time" name="hora_inicio" class="w-full bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                            <select name="hora_inicio" class="w-full bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                                <option value="" disabled selected>Seleccione la hora...</option>
+                                @php
+                                    $start = strtotime('08:00');
+                                    $end = strtotime('19:30');
+                                @endphp
+                                @for ($i = $start; $i <= $end; $i += 1800)
+                                    <option value="{{ date('H:i', $i) }}">⏰ {{ date('H:i', $i) }} hrs</option>
+                                @endfor
+                            </select>
                         </div>
                     </div>
 

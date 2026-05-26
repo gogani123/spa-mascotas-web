@@ -33,6 +33,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/calendario-interactivo', [App\Http\Controllers\CitaController::class, 'calendario'])->name('citas.calendario');
     Route::get('/api/citas-eventos', [App\Http\Controllers\CitaController::class, 'apiEventos']);
     Route::post('/api/citas-mover/{id}', [App\Http\Controllers\CitaController::class, 'apiMover']);
+    Route::get('/citas/{cita}/atender', [App\Http\Controllers\CitaController::class, 'atender'])->name('citas.atender');
+    Route::post('/citas/{cita}/completar', [App\Http\Controllers\CitaController::class, 'completar'])->name('citas.completar');
 });
 
 // Rutas del 2FA (Seguridad de Administrador)

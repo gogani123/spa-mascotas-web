@@ -119,6 +119,10 @@
                                         @if(Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2)
                                             <th class="px-4 py-3 text-center border-l border-gray-700">Acciones / Cobranza</th>
                                         @endif
+                                        
+                                        @if(Auth::user()->rol_id == 3)
+                                            <th class="px-4 py-3 text-center border-l border-gray-700">Operación</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-700">
@@ -136,8 +140,9 @@
                                             <td class="px-4 py-4 text-emerald-400 font-semibold">{{ $cita->groomer->name ?? 'Por asignar' }}</td>
                                             <td class="px-4 py-4 text-center">
                                                 <span class="px-2 py-1 text-xs font-semibold rounded-full 
-                                                    {{ $cita->estado == 'Confirmada' ? 'bg-green-900 text-green-300' : 
-                                                      ($cita->estado == 'Pendiente' ? 'bg-yellow-900 text-yellow-300' : 'bg-red-900 text-red-300') }}">
+                                                    {{ $cita->estado == 'Completada' ? 'bg-indigo-900 text-indigo-300' : 
+                                                      ($cita->estado == 'Confirmada' ? 'bg-green-900 text-green-300' : 
+                                                      ($cita->estado == 'Pendiente' ? 'bg-yellow-900 text-yellow-300' : 'bg-red-900 text-red-300')) }}">
                                                     {{ $cita->estado }}
                                                 </span>
                                             </td>
@@ -182,6 +187,21 @@
                                                     </div>
                                                 </td>
                                             @endif
+
+                                            @if(Auth::user()->rol_id == 3)
+                                                <td class="px-4 py-4 text-center border-l border-gray-700">
+                                                    @if($cita->estado == 'Confirmada')
+                                                        <a href="{{ route('citas.atender', $cita->id) }}" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-full font-bold shadow-md transition-all hover:shadow-lg inline-block">
+                                                            ✂️ Atender Mascota
+                                                        </a>
+                                                    @elseif($cita->estado == 'Completada')
+                                                        <span class="text-xs bg-gray-700 text-indigo-300 px-3 py-1.5 rounded-full border border-indigo-900 font-bold">✨ Completado</span>
+                                                    @else
+                                                        <span class="text-xs text-gray-500 italic">Pendiente de Recepción</span>
+                                                    @endif
+                                                </td>
+                                            @endif
+
                                         </tr>
                                     @endforeach
                                 </tbody>
