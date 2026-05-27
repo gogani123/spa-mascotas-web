@@ -7,11 +7,15 @@ use App\Http\Controllers\Admin\HorarioAtencionController;
 use App\Http\Controllers\MascotaController;
 use App\Http\Middleware\CheckRole;
 use App\Http\Controllers\Admin\AuditController;
-use App\Http\Controllers\Admin\UserController; // <-- Agregado para que no falle la tabla de personal
+use App\Http\Controllers\Admin\UserController; 
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TwoFactorController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\TiendaController;
+use App\Http\Controllers\GroomerController;
+use App\Http\Controllers\InventarioController;
+
 
 Route::get('/', function () {
     return view('welcome');
@@ -35,6 +39,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/citas-mover/{id}', [App\Http\Controllers\CitaController::class, 'apiMover']);
     Route::get('/citas/{cita}/atender', [App\Http\Controllers\CitaController::class, 'atender'])->name('citas.atender');
     Route::post('/citas/{cita}/completar', [App\Http\Controllers\CitaController::class, 'completar'])->name('citas.completar');
+    Route::post('/citas/{id}/completar', [App\Http\Controllers\CitaController::class, 'completar'])->name('citas.completar');
+    Route::middleware(['auth'])->group(function () {
+    Route::get('/tienda', [TiendaController::class, 'index'])->name('tienda.index');
+    Route::post('/tienda/agregar/{id}', [TiendaController::class, 'agregar'])->name('tienda.agregar');
+    Route::post('/tienda/vaciar', [TiendaController::class, 'vaciar'])->name('tienda.vaciar');
+    Route::post('/tienda/cupon', [TiendaController::class, 'aplicarCupon'])->name('tienda.cupon');  
+    });
 });
 
 // Rutas del 2FA (Seguridad de Administrador)
@@ -73,5 +84,43 @@ Route::middleware(['auth', 'verified', '2fa', CheckRole::class . ':1'])->prefix(
 
     // Catálogo de Servicios
     Route::resource('servicios', ServicioController::class)->except(['show', 'edit', 'update']);
+    
+    // Gestión de Inventario
+    Route::prefix('inventario')->name('inventario.')->group(function () {
+        Route::get('/', [InventarioController::class, 'index'])->name('index');
+        Route::get('crear', [InventarioController::class, 'create'])->name('create');
+        Route::post('/', [InventarioController::class, 'store'])->name('store');
+        Route::get('{insumo}/editar', [InventarioController::class, 'edit'])->name('edit');
+        Route::put('{insumo}', [InventarioController::class, 'update'])->name('update');
+        Route::delete('{insumo}', [InventarioController::class, 'destroy'])->name('destroy');
+        Route::get('alertas', [InventarioController::class, 'alertas'])->name('alertas');
+        Route::post('{insumo}/entrada', [InventarioController::class, 'registrarEntrada'])->name('entrada');
+    });
 });
+
+
+// RUTAS EXCLUSIVAS: GROOMER (3)
+Route::middleware(['auth', 'verified', CheckRole::class . ':3'])->prefix('groomer')->name('groomer.')->group(function () {
+    
+    // Agenda personal del groomer (día o semana)
+    Route::get('agenda', [GroomerController::class, 'agendaPersonal'])->name('agenda');
+    
+    // Ficha técnica de atención
+    Route::get('ficha/{cita}', [GroomerController::class, 'fichaPanel'])->name('ficha.panel');
+    Route::post('ficha/{cita}/guardar', [GroomerController::class, 'guardarFicha'])->name('ficha.guardar');
+    
+    // Checklist de tareas
+    Route::post('ficha/{cita}/checklist', [GroomerController::class, 'guardarChecklist'])->name('checklist.guardar');
+    
+    // Galería de fotos (antes y después)
+    Route::post('ficha/{cita}/fotos', [GroomerController::class, 'cargarFotos'])->name('fotos.cargar');
+    
+    // Panel de insumos
+    Route::get('insumos/{cita}', [GroomerController::class, 'panelInsumos'])->name('insumos.panel');
+    Route::post('insumos/{cita}/usar', [GroomerController::class, 'registrarUsoInsumos'])->name('insumos.usar');
+    
+    // Cierre del servicio
+    Route::post('ficha/{cita}/cerrar', [GroomerController::class, 'cerrarServicio'])->name('servicio.cerrar');
+});
+
 require __DIR__.'/auth.php';

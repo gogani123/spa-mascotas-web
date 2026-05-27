@@ -20,6 +20,9 @@
                     <x-nav-link :href="route('citas.index')" :active="request()->routeIs('citas.index')">
                         {{ __('Ver Citas') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('tienda.index')" :active="request()->routeIs('tienda.*')">
+                        {{ __('Tienda & Catálogo') }}
+                    </x-nav-link>
                     
                     <x-nav-link :href="route('citas.create')" :active="request()->routeIs('citas.create')">
                         {{ __('Agendar Cita') }}

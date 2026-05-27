@@ -7,6 +7,7 @@ use App\Models\Servicio;
 use App\Models\User;
 use App\Models\Mascota;
 use App\Models\Bloqueo;
+use App\Services\NotificacionService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -171,7 +172,7 @@ class CitaController extends Controller
 
         $estado_inicial = (Auth::user()->rol_id == 4) ? 'Pendiente' : 'Confirmada';
 
-        Cita::create([
+        $cita = Cita::create([
             'cliente_id' => $mascota->user_id, 
             'mascota_id' => $request->mascota_id,
             'servicio_id' => $servicio->id,
@@ -181,6 +182,14 @@ class CitaController extends Controller
             'hora_fin' => $hora_fin->format('H:i'),
             'estado' => $estado_inicial,
         ]);
+
+        // Disparar notificación cuando cliente solicita cita
+        if (Auth::user()->rol_id == 4) {
+            NotificacionService::notificarSolicitudEnRevision($cita);
+        } else {
+            // Si es admin/recepción, la cita se crea directamente confirmada
+            NotificacionService::notificarCitaConfirmada($cita);
+        }
 
         return redirect()->back()->with('success', '¡Cita agendada exitosamente! El sistema verificó la disponibilidad y el turno del profesional.');
     }
@@ -247,7 +256,11 @@ class CitaController extends Controller
         return response()->json(['success' => true]);
     }
 
-    // APROBACIONES (PUNTO 3.2)
+    // A
+        // Disparar notificación cuando recepción confirma la cita
+        NotificacionService::notificarCitaConfirmada($cita);
+        
+        PROBACIONES (PUNTO 3.2)
     public function aprobar(Cita $cita)
     {
         if (Auth::user()->rol_id == 4) {
@@ -267,42 +280,56 @@ class CitaController extends Controller
         }
         return view('citas.atender', compact('cita'));
     }
-
-    public function completar(Request $request, Cita $cita)
+    // ====================================================================
+    // MÓDULO DE GROOMING: FINALIZAR SERVICIO Y GUARDAR FICHA (PUNTO 3.2)
+    // ====================================================================
+    public function completar(Request $request, $id)
     {
+        $cita = \App\Models\Cita::findOrFail($id);
+
+        // 1. Validar los datos que vienen de tu formulario
         $request->validate([
             'estado_inicial' => 'required|string',
-            'checklist' => 'required|array',
-            'foto_antes' => 'nullable|image|max:2048',
-            'foto_despues' => 'nullable|image|max:2048',
+            'foto_antes'     => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'foto_despues'   => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        $ruta_antes = $cita->foto_antes;
+        // 2. Subir las fotos a la carpeta "storage/app/public/grooming"
+        $rutaAntes = null;
         if ($request->hasFile('foto_antes')) {
-            $ruta_antes = $request->file('foto_antes')->store('fotos_citas', 'public');
+            $rutaAntes = $request->file('foto_antes')->store('grooming', 'public');
         }
 
-        $ruta_despues = $cita->foto_despues;
+        $rutaDespues = null;
         if ($request->hasFile('foto_despues')) {
-            $ruta_despues = $request->file('foto_despues')->store('fotos_citas', 'public');
+            $rutaDespues = $request->file('foto_despues')->store('grooming', 'public');
         }
 
-        $insumos_registrados = [
-            'shampoo' => $request->input('insumo_shampoo', '0ml'),
-            'perfume' => $request->input('insumo_perfume', 'No usado'),
-            'algodon' => $request->input('insumo_algodon', 'No usado'),
-            'observaciones' => $request->input('insumo_obs', 'Ninguna')
+        // 3. Empacar el checklist y los insumos en un solo paquete JSON
+        $datosJson = [
+            'tareas'  => $request->checklist ?? [],
+            'insumos' => [
+                'shampoo' => $request->insumo_shampoo,
+                'perfume' => $request->insumo_perfume,
+                'algodon' => $request->insumo_algodon,
+            ]
         ];
 
-        $cita->update([
-            'estado_inicial' => $request->estado_inicial,
-            'checklist' => $request->checklist,
-            'insumos' => $insumos_registrados,
-            'foto_antes' => $ruta_antes,
-            'foto_despues' => $ruta_despues,
-            'estado' => 'Completada', 
-        ]);
+        // 4. Guardar todo en la tabla fichas_grooming
+        \App\Models\FichaGrooming::updateOrCreate(
+            ['cita_id' => $cita->id], // Busca si ya existe una ficha para esta cita
+            [
+                'estado_ingreso' => $request->estado_inicial,
+                'checklist_json' => json_encode($datosJson),
+                'foto_antes'     => $rutaAntes,
+                'foto_despues'   => $rutaDespues,
+            ]
+        );
 
-        return redirect()->route('citas.index')->with('success', '¡Servicio finalizado con éxito! El estado de la mascota y sus fotos quedaron registrados en su ficha técnica.');
+        // 5. Cambiar el estado de la cita
+        $cita->update(['estado' => 'Completada']); // o 'Finalizada'
+
+        // 6. Volver a la agenda con un mensaje de éxito
+        return redirect()->route('citas.index')->with('success', '¡Servicio cerrado exitosamente! La ficha técnica y las fotos han sido guardadas.');
     }
 }

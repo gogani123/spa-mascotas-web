@@ -54,4 +54,16 @@ class Cita extends Model
     {
         return $this->belongsTo(User::class, 'groomer_id');
     }
+
+    // Relación: Una cita tiene una Ficha de Grooming
+    public function fichaGrooming()
+    {
+        return $this->hasOne(FichaGrooming::class, 'cita_id');
+    }
+
+    // Relación: Una cita tiene muchas salidas de insumos
+    public function salidaInsumos()
+    {
+        return $this->hasMany(SalidaInsumo::class, 'cita_id');
+    }
 }
