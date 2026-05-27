@@ -9,7 +9,6 @@ use App\Models\Servicio;
 use App\Models\User;
 use App\Models\Insumo;
 use App\Models\SalidaInsumo;
-use App\Services\NotificacionService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -266,8 +265,8 @@ class GroomerController extends Controller
             }
         }
 
-        // Notificar al cliente que está listo para recoger
-        NotificacionService::notificarListoParaRecoger($cita);
+        // Notificar al cliente (aquí irá la lógica de notificaciones)
+        // NotificacionService::notificarRecojo($cita);
 
         return back()->with('success', '✅ Servicio cerrado exitosamente. El cliente ha sido notificado.');
     }

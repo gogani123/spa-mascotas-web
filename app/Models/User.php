@@ -64,12 +64,4 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(Mascota::class);
     }
-
-    /**
-     * Relación: Un Usuario tiene muchas Notificaciones
-     */
-    public function notificaciones()
-    {
-        return $this->hasMany(Notificacion::class, 'usuario_id');
-    }
 }

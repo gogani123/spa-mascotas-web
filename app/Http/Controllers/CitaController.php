@@ -7,7 +7,6 @@ use App\Models\Servicio;
 use App\Models\User;
 use App\Models\Mascota;
 use App\Models\Bloqueo;
-use App\Services\NotificacionService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -172,7 +171,7 @@ class CitaController extends Controller
 
         $estado_inicial = (Auth::user()->rol_id == 4) ? 'Pendiente' : 'Confirmada';
 
-        $cita = Cita::create([
+        Cita::create([
             'cliente_id' => $mascota->user_id, 
             'mascota_id' => $request->mascota_id,
             'servicio_id' => $servicio->id,
@@ -182,14 +181,6 @@ class CitaController extends Controller
             'hora_fin' => $hora_fin->format('H:i'),
             'estado' => $estado_inicial,
         ]);
-
-        // Disparar notificación cuando cliente solicita cita
-        if (Auth::user()->rol_id == 4) {
-            NotificacionService::notificarSolicitudEnRevision($cita);
-        } else {
-            // Si es admin/recepción, la cita se crea directamente confirmada
-            NotificacionService::notificarCitaConfirmada($cita);
-        }
 
         return redirect()->back()->with('success', '¡Cita agendada exitosamente! El sistema verificó la disponibilidad y el turno del profesional.');
     }
@@ -256,11 +247,7 @@ class CitaController extends Controller
         return response()->json(['success' => true]);
     }
 
-    // A
-        // Disparar notificación cuando recepción confirma la cita
-        NotificacionService::notificarCitaConfirmada($cita);
-        
-        PROBACIONES (PUNTO 3.2)
+    // APROBACIONES (PUNTO 3.2)
     public function aprobar(Cita $cita)
     {
         if (Auth::user()->rol_id == 4) {

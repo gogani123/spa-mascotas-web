@@ -14,7 +14,6 @@ use App\Http\Controllers\TwoFactorController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TiendaController;
 use App\Http\Controllers\GroomerController;
-use App\Http\Controllers\InventarioController;
 
 
 Route::get('/', function () {
@@ -84,18 +83,6 @@ Route::middleware(['auth', 'verified', '2fa', CheckRole::class . ':1'])->prefix(
 
     // Catálogo de Servicios
     Route::resource('servicios', ServicioController::class)->except(['show', 'edit', 'update']);
-    
-    // Gestión de Inventario
-    Route::prefix('inventario')->name('inventario.')->group(function () {
-        Route::get('/', [InventarioController::class, 'index'])->name('index');
-        Route::get('crear', [InventarioController::class, 'create'])->name('create');
-        Route::post('/', [InventarioController::class, 'store'])->name('store');
-        Route::get('{insumo}/editar', [InventarioController::class, 'edit'])->name('edit');
-        Route::put('{insumo}', [InventarioController::class, 'update'])->name('update');
-        Route::delete('{insumo}', [InventarioController::class, 'destroy'])->name('destroy');
-        Route::get('alertas', [InventarioController::class, 'alertas'])->name('alertas');
-        Route::post('{insumo}/entrada', [InventarioController::class, 'registrarEntrada'])->name('entrada');
-    });
 });
 
 
