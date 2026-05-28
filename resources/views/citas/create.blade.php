@@ -63,17 +63,24 @@
                         </select>
                     </div>
 
-                    @if(Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2)
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Asignar Groomer (Peluquero) *</label>
-                            <select name="groomer_id" class="w-full bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
-                                <option value="" disabled selected>Selecciona al estilista encargado...</option>
-                                @foreach(\App\Models\User::where('rol_id', 3)->get() as $groomer)
-                                    <option value="{{ $groomer->id }}">✂️ {{ $groomer->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    @endif
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">
+                            {{ Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2 ? 'Asignar Groomer (Peluquero) *' : 'Preferencia de Groomer (Opcional)' }}
+                        </label>
+                        <select name="groomer_id" class="w-full bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" {{ Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2 ? 'required' : '' }}>
+                            
+                            <option value="" selected>
+                                {{ Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2 ? '-- Selecciona al estilista encargado --' : 'Sin preferencia (El sistema asignará uno disponible)' }}
+                            </option>
+                            
+                            @foreach($groomers as $groomer)
+                                <option value="{{ $groomer->id }}">✂️ {{ $groomer->name }}</option>
+                            @endforeach
+                        </select>
+                        @if(Auth::user()->rol_id == 4)
+                            <p class="text-xs text-gray-500 mt-1">Si tu mascota tiene un estilista favorito, elígelo aquí.</p>
+                        @endif
+                    </div>
 
                     <div class="grid grid-cols-2 gap-6">
                         <div>

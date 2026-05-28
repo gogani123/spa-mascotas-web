@@ -16,7 +16,6 @@ use App\Http\Controllers\TiendaController;
 use App\Http\Controllers\GroomerController;
 use App\Http\Controllers\InventarioController;
 
-
 Route::get('/', function () {
     return view('welcome');
 });
@@ -29,8 +28,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    
+    // Rutas de Mascotas
     Route::resource('mascotas', MascotaController::class);
-    Route::resource('citas', CitaController::class);
+    Route::get('/mascotas/crear', [MascotaController::class, 'create'])->name('mascotas.create');
+    Route::post('/mascotas', [MascotaController::class, 'store'])->name('mascotas.store');
+    
+    // --- RUTAS DE CITAS CORREGIDAS ---
+    Route::get('/citas', [App\Http\Controllers\CitaController::class, 'index'])->name('citas.index');
+    Route::get('/citas/crear', [App\Http\Controllers\CitaController::class, 'create'])->name('citas.create');
+    Route::post('/citas', [App\Http\Controllers\CitaController::class, 'store'])->name('citas.store');
+    // ---------------------------------
+    
     Route::get('/citas/{cita}/cobrar', [App\Http\Controllers\CitaController::class, 'cobrar'])->name('citas.cobrar');
     Route::post('/citas/{cita}/aprobar', [App\Http\Controllers\CitaController::class, 'aprobar'])->name('citas.aprobar');
     Route::post('/citas/{cita}/pagar', [App\Http\Controllers\CitaController::class, 'pagar'])->name('citas.pagar');
@@ -39,12 +48,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/citas-mover/{id}', [App\Http\Controllers\CitaController::class, 'apiMover']);
     Route::get('/citas/{cita}/atender', [App\Http\Controllers\CitaController::class, 'atender'])->name('citas.atender');
     Route::post('/citas/{cita}/completar', [App\Http\Controllers\CitaController::class, 'completar'])->name('citas.completar');
-    Route::post('/citas/{id}/completar', [App\Http\Controllers\CitaController::class, 'completar'])->name('citas.completar');
+    
+    // Rutas de la Tienda
     Route::middleware(['auth'])->group(function () {
-    Route::get('/tienda', [TiendaController::class, 'index'])->name('tienda.index');
-    Route::post('/tienda/agregar/{id}', [TiendaController::class, 'agregar'])->name('tienda.agregar');
-    Route::post('/tienda/vaciar', [TiendaController::class, 'vaciar'])->name('tienda.vaciar');
-    Route::post('/tienda/cupon', [TiendaController::class, 'aplicarCupon'])->name('tienda.cupon');  
+        Route::get('/tienda', [TiendaController::class, 'index'])->name('tienda.index');
+        Route::post('/tienda/agregar/{id}', [TiendaController::class, 'agregar'])->name('tienda.agregar');
+        Route::post('/tienda/vaciar', [TiendaController::class, 'vaciar'])->name('tienda.vaciar');
+        Route::post('/tienda/cupon', [TiendaController::class, 'aplicarCupon'])->name('tienda.cupon');  
     });
 });
 
@@ -59,33 +69,19 @@ Route::middleware('auth')->group(function () {
 Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])->name('google.redirect');
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('google.callback');
 
-
 // RUTAS COMPARTIDAS: ADMINISTRADOR (1) Y RECEPCIÓN (2)
-
 Route::middleware(['auth', 'verified', '2fa', CheckRole::class . ':1,2'])->prefix('admin')->name('admin.')->group(function () {
-    
-    // Configuración del Horario Laboral Global
     Route::get('horarios', [HorarioAtencionController::class, 'index'])->name('horarios.index');
     Route::put('horarios', [HorarioAtencionController::class, 'update'])->name('horarios.update');
-
-    // Gestión de Bloqueos (Excepciones de agenda)
     Route::resource('bloqueos', BloqueoController::class)->except(['show', 'edit', 'update']);
 });
 
-
 // RUTAS EXCLUSIVAS: SOLO ADMINISTRADOR (1)
 Route::middleware(['auth', 'verified', '2fa', CheckRole::class . ':1'])->prefix('admin')->name('admin.')->group(function () {
-    
-    // Gestión de Personal
     Route::resource('users', UserController::class);
-
-    // Pantalla de Auditoría
     Route::get('auditoria', [AuditController::class, 'index'])->name('auditoria.index');
-
-    // Catálogo de Servicios
     Route::resource('servicios', ServicioController::class)->except(['show', 'edit', 'update']);
     
-    // Gestión de Inventario
     Route::prefix('inventario')->name('inventario.')->group(function () {
         Route::get('/', [InventarioController::class, 'index'])->name('index');
         Route::get('crear', [InventarioController::class, 'create'])->name('create');
@@ -98,29 +94,16 @@ Route::middleware(['auth', 'verified', '2fa', CheckRole::class . ':1'])->prefix(
     });
 });
 
-
 // RUTAS EXCLUSIVAS: GROOMER (3)
 Route::middleware(['auth', 'verified', CheckRole::class . ':3'])->prefix('groomer')->name('groomer.')->group(function () {
-    
-    // Agenda personal del groomer (día o semana)
     Route::get('agenda', [GroomerController::class, 'agendaPersonal'])->name('agenda');
-    
-    // Ficha técnica de atención
     Route::get('ficha/{cita}', [GroomerController::class, 'fichaPanel'])->name('ficha.panel');
     Route::post('ficha/{cita}/guardar', [GroomerController::class, 'guardarFicha'])->name('ficha.guardar');
-    
-    // Checklist de tareas
     Route::post('ficha/{cita}/checklist', [GroomerController::class, 'guardarChecklist'])->name('checklist.guardar');
-    
-    // Galería de fotos (antes y después)
     Route::post('ficha/{cita}/fotos', [GroomerController::class, 'cargarFotos'])->name('fotos.cargar');
-    
-    // Panel de insumos
     Route::get('insumos/{cita}', [GroomerController::class, 'panelInsumos'])->name('insumos.panel');
     Route::post('insumos/{cita}/usar', [GroomerController::class, 'registrarUsoInsumos'])->name('insumos.usar');
-    
-    // Cierre del servicio
     Route::post('ficha/{cita}/cerrar', [GroomerController::class, 'cerrarServicio'])->name('servicio.cerrar');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__.'/auth.php'; 

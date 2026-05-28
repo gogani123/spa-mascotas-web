@@ -42,10 +42,14 @@ class CitaController extends Controller
     }
 
     // Función para mostrar el formulario de Agendar
+    // Función para mostrar el formulario de Agendar
     public function create()
     {
         $servicios = Servicio::orderBy('nombre', 'asc')->get();
         $usuario = Auth::user();
+        
+        // NUEVO: Traemos a los groomers para que el cliente pueda elegir su preferencia
+        $groomers = User::where('rol_id', 3)->get(); 
 
         if ($usuario->rol_id == 1 || $usuario->rol_id == 2) {
             $mascotas = Mascota::orderBy('nombre', 'asc')->get();
@@ -53,7 +57,8 @@ class CitaController extends Controller
             $mascotas = Mascota::where('user_id', $usuario->id)->get();
         }
 
-        return view('citas.create', compact('servicios', 'mascotas'));
+        // Agregamos 'groomers' al compact
+        return view('citas.create', compact('servicios', 'mascotas', 'groomers')); 
     }
 
     // Función que guarda la cita, calcula tiempos, valida bloqueos y TURNOS (Mañana, Tarde, Completo)
@@ -258,9 +263,7 @@ class CitaController extends Controller
 
     // A
         // Disparar notificación cuando recepción confirma la cita
-        NotificacionService::notificarCitaConfirmada($cita);
-        
-        PROBACIONES (PUNTO 3.2)
+        //NotificacionService::notificarCitaConfirmada($cita);
     public function aprobar(Cita $cita)
     {
         if (Auth::user()->rol_id == 4) {
