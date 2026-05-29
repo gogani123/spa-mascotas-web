@@ -14,9 +14,33 @@
                     <p class="text-gray-400 mt-2">Completa la ficha técnica para que podamos brindarle el mejor servicio en el Spa.</p>
                 </div>
 
+                @if($errors->any())
+                    <div class="mb-6 p-4 bg-red-900/80 border border-red-700 text-red-200 rounded-md font-medium text-sm">
+                        <p class="font-bold mb-1">❌ Por favor corrige los siguientes errores:</p>
+                        <ul class="list-disc list-inside">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 <form method="POST" action="{{ route('mascotas.store') }}" enctype="multipart/form-data">
                     @csrf
                     
+                    @if(Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2)
+                        <div class="mb-8 bg-gray-900/50 p-4 rounded-md border border-indigo-500/30">
+                            <label class="block text-sm font-bold text-indigo-300">Asignar a un Cliente (Dueño) *</label>
+                            <select name="user_id" required class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 text-sm">
+                                <option value="" disabled selected>-- Elige al usuario dueño de la mascota --</option>
+                                @foreach(\App\Models\User::where('rol_id', 4)->orderBy('name', 'asc')->get() as $cliente)
+                                    <option value="{{ $cliente->id }}">{{ $cliente->name }} ({{ $cliente->email }})</option>
+                                @endforeach
+                            </select>
+                            <p class="text-[11px] text-gray-400 mt-1">Como personal del Spa, debes elegir a qué cliente le pertenece esta mascota.</p>
+                        </div>
+                    @endif
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         
                         <div class="space-y-5">
@@ -24,7 +48,7 @@
                             
                             <div>
                                 <label class="block text-sm font-medium text-gray-400">Nombre de la Mascota *</label>
-                                <input type="text" name="nombre" class="w-full mt-1 bg-gray-900 border-gray-700 text-white focus:ring-indigo-500 focus:border-indigo-500 rounded-md shadow-sm" required>
+                                <input type="text" name="nombre" value="{{ old('nombre') }}" class="w-full mt-1 bg-gray-900 border-gray-700 text-white focus:ring-indigo-500 focus:border-indigo-500 rounded-md shadow-sm" required>
                             </div>
 
                             <div class="grid grid-cols-2 gap-4">
@@ -32,14 +56,14 @@
                                     <label class="block text-sm font-medium text-gray-400">Especie *</label>
                                     <select name="especie" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
                                         <option value="" disabled selected>Selecciona...</option>
-                                        <option value="Perro">Perro</option>
-                                        <option value="Gato">Gato</option>
-                                        <option value="Otro">Otro</option>
+                                        <option value="Perro" {{ old('especie') == 'Perro' ? 'selected' : '' }}>Perro</option>
+                                        <option value="Gato" {{ old('especie') == 'Gato' ? 'selected' : '' }}>Gato</option>
+                                        <option value="Otro" {{ old('especie') == 'Otro' ? 'selected' : '' }}>Otro</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-400">Raza (Opcional)</label>
-                                    <input type="text" name="raza" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                    <input type="text" name="raza" value="{{ old('raza') }}" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
                                 </div>
                             </div>
 
@@ -48,15 +72,15 @@
                                     <label class="block text-sm font-medium text-gray-400">Tamaño *</label>
                                     <select name="tamano" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
                                         <option value="" disabled selected>Selecciona...</option>
-                                        <option value="Pequeña">Pequeña</option>
-                                        <option value="Mediana">Mediana (+10% tiempo)</option>
-                                        <option value="Grande">Grande (+15% tiempo)</option>
-                                        <option value="Gigante">Gigante / Raza Compleja (+30% tiempo)</option>
+                                        <option value="Pequeño" {{ old('tamano') == 'Pequeño' ? 'selected' : '' }}>Pequeño/a</option>
+                                        <option value="Mediano" {{ old('tamano') == 'Mediano' ? 'selected' : '' }}>Mediano/a (+10% tiempo)</option>
+                                        <option value="Grande" {{ old('tamano') == 'Grande' ? 'selected' : '' }}>Grande (+15% tiempo)</option>
+                                        <option value="Gigante" {{ old('tamano') == 'Gigante' ? 'selected' : '' }}>Gigante / Raza Compleja (+30% tiempo)</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-400">Fecha de Nacimiento *</label>
-                                    <input type="date" name="fecha_nacimiento" class="w-full mt-1 bg-gray-900 border-gray-700 text-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                                    <input type="date" name="fecha_nacimiento" value="{{ old('fecha_nacimiento') }}" class="w-full mt-1 bg-gray-900 border-gray-700 text-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
                                 </div>
                             </div>
                         </div>
@@ -68,15 +92,15 @@
                                 <label class="block text-sm font-medium text-gray-400">Comportamiento *</label>
                                 <select name="comportamiento" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
                                     <option value="" disabled selected>¿Cómo se comporta normalmente?</option>
-                                    <option value="Normal">Tranquilo / Normal</option>
-                                    <option value="Nerviosa">Nervioso / Asustadizo (+20 min extra)</option>
-                                    <option value="Agresiva">Agresivo / Reactivo (+20 min extra)</option>
+                                    <option value="Tranquilo" {{ old('comportamiento') == 'Tranquilo' ? 'selected' : '' }}>Tranquilo / Normal</option>
+                                    <option value="Nervioso" {{ old('comportamiento') == 'Nervioso' ? 'selected' : '' }}>Nervioso / Asustadizo (+20 min extra)</option>
+                                    <option value="Agresivo" {{ old('comportamiento') == 'Agresivo' ? 'selected' : '' }}>Agresivo / Reactivo (+20 min extra)</option>
                                 </select>
                             </div>
 
                             <div>
                                 <label class="block text-sm font-medium text-gray-400">Alergias o médicas (Opcional)</label>
-                                <textarea name="alergias" rows="2" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                                <textarea name="alergias" rows="2" class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">{{ old('alergias') }}</textarea>
                             </div>
 
                             <div>

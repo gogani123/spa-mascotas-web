@@ -108,15 +108,35 @@
                             </div>
                         </div>
 
-                        <div class="space-y-3">
+                        <div class="space-y-4">
                             <button onclick="enviarWhatsApp()" class="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded shadow transition flex items-center justify-center gap-2 text-lg">
                                 📱 Pedir por WhatsApp
                             </button>
 
+                            @if(Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2)
+                                <div class="border-t border-gray-700 pt-4 mt-2">
+                                    <form method="POST" action="{{ route('tienda.comprar') }}" class="space-y-3">
+                                        @csrf
+                                        <div>
+                                            <label class="text-[11px] text-indigo-300 block mb-1 font-bold uppercase tracking-wider">Registrar Pago en Mostrador:</label>
+                                            <select name="metodo_pago" required class="w-full bg-gray-900 border-gray-700 text-white rounded text-sm focus:ring-indigo-500 focus:border-indigo-500 p-2">
+                                                <option value="">-- Seleccione medio de cobro --</option>
+                                                <option value="Efectivo">💵 Efectivo</option>
+                                                <option value="QR">📱 Código QR</option>
+                                                <option value="Transferencia">🏦 Transferencia Bancaria</option>
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded shadow transition text-sm flex items-center justify-center gap-1">
+                                            ✔ Confirmar Cobro y Entregar
+                                        </button>
+                                    </form>
+                                </div>
+                            @endif
+
                             <form method="POST" action="{{ route('tienda.vaciar') }}">
                                 @csrf
-                                <button type="submit" class="w-full py-2 bg-red-900 hover:bg-red-800 text-red-200 font-bold rounded shadow transition text-sm">
-                                    🗑️ Vaciar Carrito
+                                <button type="submit" class="w-full py-2 bg-red-900/60 hover:bg-red-800 text-red-200 font-medium rounded shadow transition text-xs opacity-70 hover:opacity-100">
+                                    🗑️ Vaciar Todo el Carrito
                                 </button>
                             </form>
                         </div>

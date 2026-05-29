@@ -72,4 +72,21 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(Notificacion::class, 'usuario_id');
     }
+    /**
+     * Sobrescribe el envío de verificación nativo de Laravel
+     */
+    public function sendEmailVerificationNotification()
+    {
+        // Genera un código de 6 caracteres aleatorios (Letras y Números en Mayúscula)
+        $codigoGenerado = strtoupper(\Illuminate\Support\Str::random(6));
+
+        // Guarda el código en el usuario actual de forma silenciosa
+        $this->forceFill([
+            'verification_code' => $codigoGenerado
+        ])->save();
+
+        // Envía el correo usando nuestro Mailable en español
+        \Illuminate\Support\Facades\Mail::to($this->email)
+            ->send(new \App\Mail\CodigoVerificacionMail($codigoGenerado, $this->name));
+    }
 }

@@ -68,11 +68,9 @@
                             {{ Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2 ? 'Asignar Groomer (Peluquero) *' : 'Preferencia de Groomer (Opcional)' }}
                         </label>
                         <select name="groomer_id" class="w-full bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" {{ Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2 ? 'required' : '' }}>
-                            
                             <option value="" selected>
                                 {{ Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2 ? '-- Selecciona al estilista encargado --' : 'Sin preferencia (El sistema asignará uno disponible)' }}
                             </option>
-                            
                             @foreach($groomers as $groomer)
                                 <option value="{{ $groomer->id }}">✂️ {{ $groomer->name }}</option>
                             @endforeach
@@ -90,7 +88,7 @@
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-300 mb-1">Hora de Inicio *</label>
-                            <select name="hora_inicio" class="w-full bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                            <select name="hora_inicio" id="hora_inicio" class="w-full bg-gray-900 border-gray-700 text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
                                 <option value="" disabled selected>Seleccione la hora...</option>
                                 @php
                                     $start = strtotime('08:00');
@@ -113,3 +111,55 @@
         </div>
     </div>
 </x-app-layout>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const groomerSelect  = document.querySelector('select[name="groomer_id"]');
+        const fechaInput     = document.querySelector('input[name="fecha"]');
+        const mascotaSelect  = document.querySelector('select[name="mascota_id"]');
+        const servicioSelect = document.querySelector('select[name="servicio_id"]');
+        const horaSelect     = document.getElementById('hora_inicio');
+
+        function consultarDisponibilidad() {
+            if (!groomerSelect.value || !fechaInput.value || !mascotaSelect.value || !servicioSelect.value) {
+                return;
+            }
+
+            horaSelect.innerHTML = '<option value="">🔍 Buscando espacios disponibles en la agenda...</option>';
+
+            fetch(`/api/horarios-disponibles?fecha=${fechaInput.value}&groomer_id=${groomerSelect.value}&mascota_id=${mascotaSelect.value}&servicio_id=${servicioSelect.value}`)
+                .then(response => {
+                    return response.json().then(data => {
+                        if (!response.ok) {
+                            // Lanza el error del backend al catch
+                            throw new Error(data.error || "Fallo interno de ejecución");
+                        }
+                        return data;
+                    });
+                })
+                .then(data => {
+                    horaSelect.innerHTML = '';
+                    
+                    if (data.horarios.length === 0) {
+                        horaSelect.innerHTML = '<option value="">❌ El Groomer no tiene disponibilidad para esta fecha</option>';
+                        return;
+                    }
+
+                    data.horarios.forEach(hora => {
+                        horaSelect.innerHTML += `<option value="${hora}">🕒 ${hora} (Turno: ${data.turno})</option>`;
+                    });
+                })
+                .catch(error => {
+                    console.error("Error detectado:", error);
+                    // Muestra el nombre exacto de la columna rota directamente en la interfaz
+                    horaSelect.innerHTML = `<option value="">❌ Error: ${error.message}</option>`;
+                });
+        }
+
+        [groomerSelect, fechaInput, mascotaSelect, servicioSelect].forEach(element => {
+            if(element) element.addEventListener('change', consultarDisponibilidad);
+        });
+
+        setTimeout(consultarDisponibilidad, 200);
+    });
+</script>

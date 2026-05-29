@@ -2,334 +2,225 @@
 
 @section('content')
 <div class="container mx-auto px-4 py-6">
-    <!-- Encabezado con info de mascota -->
-    <div class="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg shadow-md p-6 mb-6">
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg shadow-md p-6 mb-6">
         <div class="flex justify-between items-start">
             <div>
                 <h1 class="text-3xl font-bold mb-2">🐾 {{ $mascota->nombre }}</h1>
-                <p class="text-lg">{{ $mascota->raza }} • {{ $mascota->tamaño }} • {{ $cita->servicio->nombre }}</p>
+                <p class="text-lg">{{ $mascota->raza }} • {{ $mascota->tamano }} • {{ $cita->servicio->nombre }}</p>
                 <p class="text-sm mt-2">Cliente: {{ $cita->cliente->name }} | Teléfono: {{ $cita->cliente->telefono ?? 'N/A' }}</p>
             </div>
             <div class="text-right">
                 <p class="text-4xl font-bold">{{ \Carbon\Carbon::parse($cita->fecha)->format('d/m') }}</p>
                 <p class="text-lg">{{ $cita->hora_inicio }} - {{ $cita->hora_fin }}</p>
-                <span class="inline-block mt-2 px-4 py-1 bg-white text-green-600 rounded-full font-bold">
-                    {{ ucfirst($cita->estado) }}
+                <span class="inline-block mt-2 px-4 py-1 bg-white text-indigo-600 rounded-full font-bold text-xs uppercase tracking-wider">
+                    ⚡ {{ $cita->estado }}
                 </span>
             </div>
         </div>
     </div>
 
-    <!-- Navegación de tabs -->
-    <div class="bg-white rounded-lg shadow-md mb-6 border-b border-gray-200">
+    @if($errors->any())
+        <div class="mb-6 p-4 bg-red-900/80 border border-red-700 text-red-200 rounded-lg font-bold text-center text-sm shadow">
+            🛑 {{ $errors->first() }}
+        </div>
+    @endif
+
+    @if(session('success'))
+        <div class="mb-6 p-4 bg-emerald-900/80 border border-emerald-700 text-emerald-200 rounded-lg font-bold text-center text-sm shadow">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    <div class="bg-gray-800 rounded-lg shadow-md mb-6 border-b border-gray-700">
         <div class="flex overflow-x-auto">
-            <a href="#estado" onclick="activeTab('estado')" 
-               class="tab-button px-6 py-4 font-semibold text-gray-700 border-b-2 border-transparent hover:border-blue-500 transition active">
-               📋 Estado de Entrada
-            </a>
-            <a href="#checklist" onclick="activeTab('checklist')" 
-               class="tab-button px-6 py-4 font-semibold text-gray-700 border-b-2 border-transparent hover:border-blue-500 transition">
-               ✅ Checklist
-            </a>
-            <a href="#fotos" onclick="activeTab('fotos')" 
-               class="tab-button px-6 py-4 font-semibold text-gray-700 border-b-2 border-transparent hover:border-blue-500 transition">
-               📷 Fotos
-            </a>
-            <a href="#recomendaciones" onclick="activeTab('recomendaciones')" 
-               class="tab-button px-6 py-4 font-semibold text-gray-700 border-b-2 border-transparent hover:border-blue-500 transition">
-               💡 Recomendaciones
-            </a>
+            <button onclick="activeTab('estado')" class="tab-button px-6 py-4 font-semibold text-indigo-400 border-b-2 border-indigo-500 transition">
+                📋 Ficha de Ingreso
+            </button>
+            <button onclick="activeTab('checklist')" class="tab-button px-6 py-4 font-semibold text-gray-400 border-b-2 border-transparent hover:text-indigo-400 transition">
+                ✅ Checklist Técnico
+            </button>
+            <button onclick="activeTab('fotos')" class="tab-button px-6 py-4 font-semibold text-gray-400 border-b-2 border-transparent hover:text-indigo-400 transition">
+                📷 Evidencia Fotos
+            </button>
+            <button onclick="activeTab('recomendaciones')" class="tab-button px-6 py-4 font-semibold text-gray-400 border-b-2 border-transparent hover:text-indigo-400 transition">
+                💡 Recomendaciones y Cierre
+            </button>
         </div>
     </div>
 
-    <!-- TAB 1: ESTADO DE ENTRADA -->
-    <div id="estado" class="tab-content bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 Estado de Entrada de la Mascota</h2>
+    <div id="estado" class="tab-content bg-gray-800 rounded-lg shadow-md p-6 mb-6 text-gray-200">
+        <h2 class="text-xl font-bold text-indigo-400 mb-4">📋 Registro de Condición Física</h2>
         
         <form action="{{ route('groomer.ficha.guardar', $cita->id) }}" method="POST" class="space-y-6">
             @csrf
 
-            <!-- Estado físico -->
             <div>
-                <label for="estado_ingreso" class="block text-lg font-semibold text-gray-700 mb-2">
-                    🔍 Condición Física al Ingreso
+                <label for="estado_ingreso" class="block text-sm font-semibold text-gray-300 mb-2">
+                    🔍 Estado de Ingreso (Nudos, parásitos, heridas en la piel) *
                 </label>
-                <textarea name="estado_ingreso" id="estado_ingreso" rows="4"
-                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                          placeholder="Describe: nudos, heridas, pulgas, suciedad, comportamiento, etc."
-                          required>{{ $ficha->estado_ingreso ?? '' }}</textarea>
-                @error('estado_ingreso')
-                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                @enderror
+                <textarea name="estado_ingreso" id="estado_ingreso" rows="4" required
+                          class="w-full bg-gray-900 border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 p-3 text-sm"
+                          placeholder="Escriba el diagnóstico inicial del pelaje y piel...決">{{ old('estado_ingreso', $ficha->estado_ingreso ?? '') }}</textarea>
             </div>
 
-            <!-- Temperamento -->
-            <div>
-                <label for="temperamento" class="block text-lg font-semibold text-gray-700 mb-2">
-                    😊 Temperamento Observado
-                </label>
-                <select name="temperamento" id="temperamento" 
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        required>
-                    <option value="">Selecciona un temperamento...</option>
-                    <option value="tranquilo" {{ ($ficha->temperamento ?? '') === 'tranquilo' ? 'selected' : '' }}>
-                        😴 Tranquilo
-                    </option>
-                    <option value="nervioso" {{ ($ficha->temperamento ?? '') === 'nervioso' ? 'selected' : '' }}>
-                        😰 Nervioso
-                    </option>
-                    <option value="agresivo" {{ ($ficha->temperamento ?? '') === 'agresivo' ? 'selected' : '' }}>
-                        😠 Agresivo
-                    </option>
-                    <option value="inquieto" {{ ($ficha->temperamento ?? '') === 'inquieto' ? 'selected' : '' }}>
-                        🤪 Inquieto
-                    </option>
-                </select>
-                @error('temperamento')
-                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                @enderror
-            </div>
-
-            <!-- Observaciones -->
-            <div>
-                <label for="observaciones" class="block text-lg font-semibold text-gray-700 mb-2">
-                    📝 Observaciones Técnicas
-                </label>
-                <textarea name="observaciones" id="observaciones" rows="3"
-                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                          placeholder="Comentarios técnicos relevantes durante el servicio">{{ $ficha->observaciones ?? '' }}</textarea>
-            </div>
-
-            <!-- Datos de la mascota (información) -->
-            <div class="bg-gray-50 p-4 rounded-lg">
-                <h3 class="font-semibold text-gray-800 mb-3">Información Registrada de la Mascota</h3>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                        <p class="text-xs text-gray-600 uppercase font-bold">Edad</p>
-                        <p class="text-gray-800">{{ $mascota->edad_años ?? '?' }} años</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-600 uppercase font-bold">Alergias</p>
-                        <p class="text-gray-800">{{ $mascota->alergias ?? 'Ninguna registrada' }}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-600 uppercase font-bold">Vacunas</p>
-                        <p class="text-green-600 font-semibold">✅ Actualizado</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-600 uppercase font-bold">Temperamento Base</p>
-                        <p class="text-gray-800">{{ ucfirst($mascota->temperamento) }}</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Botón guardar -->
-            <button type="submit" class="w-full px-6 py-3 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition">
-                💾 Guardar Estado de Entrada
-            </button>
-        </form>
-    </div>
-
-    <!-- TAB 2: CHECKLIST -->
-    <div id="checklist" class="tab-content bg-white rounded-lg shadow-md p-6 mb-6 hidden">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">✅ Checklist de Tareas</h2>
-        <p class="text-gray-600 mb-4">Marca las tareas completadas. Se requiere mínimo 3 ítems.</p>
-
-        <form action="{{ route('groomer.checklist.guardar', $cita->id) }}" method="POST" class="space-y-4">
-            @csrf
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                @foreach($checklistBase as $tarea => $completada)
-                <div class="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-green-400 transition cursor-pointer"
-                     onclick="toggleCheckbox('{{ $tarea }}')">
-                    <input type="checkbox" name="checklist[{{ $tarea }}]" id="{{ $tarea }}" value="1"
-                           class="w-6 h-6 rounded border-gray-300 focus:ring-green-500 cursor-pointer"
-                           {{ $ficha && json_decode($ficha->checklist_json, true)[$tarea] ?? false ? 'checked' : '' }}>
-                    <label for="{{ $tarea }}" class="ml-3 text-gray-800 font-semibold cursor-pointer flex-1">
-                        @switch($tarea)
-                            @case('uñas_cortadas')
-                                ✂️ Uñas cortadas
-                                @break
-                            @case('oidos_limpios')
-                                👂 Oídos limpios
-                                @break
-                            @case('glandulas_anales')
-                                💧 Glándulas anales
-                                @break
-                            @case('baño_completo')
-                                🛁 Baño completo
-                                @break
-                            @case('secado_completo')
-                                🔥 Secado completo
-                                @break
-                            @case('perfume_aplicado')
-                                🌸 Perfume aplicado
-                                @break
-                            @case('inspección_de_piel')
-                                🔍 Inspección de piel
-                                @break
-                            @case('recomendaciones_dadas')
-                                💡 Recomendaciones dadas
-                                @break
-                        @endswitch
-                    </label>
-                </div>
-                @endforeach
-            </div>
-
-            @error('checklist')
-            <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
-            @enderror
-
-            <div class="bg-blue-50 p-4 rounded-lg mt-4">
-                <p class="text-sm text-gray-700">
-                    <span class="font-bold">Nota:</span> Marca al menos 3 tareas para poder cerrar el servicio.
-                </p>
-            </div>
-
-            <button type="submit" class="w-full px-6 py-3 bg-blue-500 text-white font-bold rounded-lg hover:bg-blue-600 transition">
-                ✅ Guardar Checklist
-            </button>
-        </form>
-    </div>
-
-    <!-- TAB 3: FOTOS -->
-    <div id="fotos" class="tab-content bg-white rounded-lg shadow-md p-6 mb-6 hidden">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">📷 Galería de Fotos</h2>
-        
-        <!-- Formulario de carga -->
-        <form action="{{ route('groomer.fotos.cargar', $cita->id) }}" method="POST" enctype="multipart/form-data" class="mb-8">
-            @csrf
-            <div class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label for="tipo_foto" class="block text-lg font-semibold text-gray-700 mb-2">
-                        📸 Tipo de Foto
+                    <label for="temperamento" class="block text-sm font-semibold text-gray-300 mb-2">
+                        🎭 Temperamento durante el lavado *
                     </label>
-                    <select name="tipo_foto" id="tipo_foto" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
-                        <option value="">Selecciona el tipo...</option>
-                        <option value="antes">📸 Antes (estado inicial)</option>
-                        <option value="durante">📹 Durante (en proceso)</option>
-                        <option value="despues">✨ Después (resultado final)</option>
+                    <select name="temperamento" id="temperamento" required
+                            class="w-full bg-gray-900 border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 p-2.5 text-sm">
+                        <option value="tranquilo" {{ old('temperamento', $ficha->temperamento ?? '') == 'tranquilo' ? 'selected' : '' }}>😴 Tranquilo / Cooperativo</option>
+                        <option value="nervioso" {{ old('temperamento', $ficha->temperamento ?? '') == 'nervioso' ? 'selected' : '' }}>😰 Nervioso / Asustadizo</option>
+                        <option value="agresivo" {{ old('temperamento', $ficha->temperamento ?? '') == 'agresivo' ? 'selected' : '' }}>😠 Agresivo / Reactivo</option>
+                        <option value="inquieto" {{ old('temperamento', $ficha->temperamento ?? '') == 'inquieto' ? 'selected' : '' }}>🤪 Inquieto / Hiperactivo</option>
                     </select>
                 </div>
 
                 <div>
-                    <label for="fotos" class="block text-lg font-semibold text-gray-700 mb-2">
-                        📤 Selecciona Imágenes
+                    <label for="observaciones" class="block text-sm font-semibold text-gray-300 mb-2">
+                        📝 Notas Médicas / Alergias Observadas (Opcional)
                     </label>
-                    <input type="file" name="fotos[]" id="fotos" multiple accept="image/*"
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" required>
-                    <p class="text-sm text-gray-600 mt-2">Máximo 10 fotos, 5MB cada una</p>
+                    <input type="text" name="observaciones" id="observaciones" value="{{ old('observaciones', $ficha->observaciones ?? '') }}"
+                           class="w-full bg-gray-900 border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 p-2.5 text-sm"
+                           placeholder="Ej: Se detectó dermatitis en el lomo.">
                 </div>
-
-                <button type="submit" class="w-full px-6 py-3 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition">
-                    📤 Subir Fotos
-                </button>
             </div>
+
+            <button type="submit" class="w-full px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-500 transition text-sm uppercase tracking-wider shadow">
+                💾 Guardar Ficha de Ingreso
+            </button>
         </form>
-
-        <!-- Galería de fotos existentes -->
-        @if(count($fotos) > 0)
-        <div>
-            <h3 class="text-xl font-bold text-gray-800 mb-4">Fotos Cargadas</h3>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                @foreach($fotos as $foto)
-                <div class="relative group">
-                    <img src="{{ asset('storage/' . $foto['path']) }}" alt="Foto {{ $foto['tipo'] }}"
-                         class="w-full h-48 object-cover rounded-lg shadow-md hover:shadow-lg transition">
-                    <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 rounded-lg transition flex items-center justify-center">
-                        <span class="text-white text-sm font-bold opacity-0 group-hover:opacity-100 transition">
-                            {{ ucfirst($foto['tipo']) }}
-                        </span>
-                    </div>
-                    <p class="text-xs text-gray-600 mt-1">{{ $foto['fecha'] }}</p>
-                </div>
-                @endforeach
-            </div>
-        </div>
-        @else
-        <div class="bg-yellow-50 p-6 rounded-lg text-center">
-            <p class="text-gray-700">📸 No hay fotos cargadas aún</p>
-        </div>
-        @endif
     </div>
 
-    <!-- TAB 4: RECOMENDACIONES Y CIERRE -->
-    <div id="recomendaciones" class="tab-content bg-white rounded-lg shadow-md p-6 mb-6 hidden">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">💡 Recomendaciones para el Dueño</h2>
-        
-        <form action="{{ route('groomer.ficha.guardar', $cita->id) }}" method="POST" class="space-y-6">
+    <div id="checklist" class="tab-content bg-gray-800 rounded-lg shadow-md p-6 mb-6 hidden text-gray-200">
+        <h2 class="text-xl font-bold text-emerald-400 mb-2">✅ Checklist de Tareas Operativas</h2>
+        <p class="text-xs text-gray-400 mb-6">Marca los procesos completados en la mesa de peluquería. (Requerido: Mínimo 3 tareas).</p>
+
+        <form action="{{ route('groomer.checklist.guardar', $cita->id) }}" method="POST" class="space-y-6">
             @csrf
-            <div>
-                <label for="recomendaciones" class="block text-lg font-semibold text-gray-700 mb-2">
-                    📝 Recomendaciones Especiales
-                </label>
-                <textarea name="recomendaciones" id="recomendaciones" rows="5"
-                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                          placeholder="Ej: Cuidados post-servicio, productos a usar, próxima cita recomendada, alimentos a evitar, etc.">{{ $ficha->recomendaciones ?? '' }}</textarea>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                @foreach($checklistBase as $tarea => $completada)
+                    @php
+                        // Decodificamos de forma segura el JSON almacenado para verificar si la tarea ya estaba marcada
+                        $jsonHistorial = $ficha && $ficha->checklist_json ? json_decode($ficha->checklist_json, true) : [];
+                        $estaMarcada = in_array($tarea, $jsonHistorial);
+                    @endphp
+                    <label class="flex items-center p-4 bg-gray-900/60 border border-gray-700 rounded-lg hover:border-emerald-500 transition cursor-pointer">
+                        <input type="checkbox" name="checklist[]" value="{{ $tarea }}" 
+                               class="w-5 h-5 rounded border-gray-700 bg-gray-800 text-emerald-500 focus:ring-indigo-500 cursor-pointer"
+                               {{ $estaMarcada ? 'checked' : '' }}>
+                        <span class="ml-3 font-semibold text-sm capitalize">
+                            {{ str_replace('_', ' ', $tarea) }}
+                        </span>
+                    </label>
+                @endforeach
             </div>
 
-            <button type="submit" class="w-full px-6 py-3 bg-blue-500 text-white font-bold rounded-lg hover:bg-blue-600 transition">
-                💾 Guardar Recomendaciones
+            <button type="submit" class="w-full px-6 py-3 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-500 transition text-sm uppercase tracking-wider shadow">
+                ✔️ Guardar Avance del Checklist
+            </button>
+        </form>
+    </div>
+
+    <div id="fotos" class="tab-content bg-gray-800 rounded-lg shadow-md p-6 mb-6 hidden text-gray-200">
+        <h2 class="text-xl font-bold text-indigo-400 mb-4">📷 Galería de Evidencia Visual</h2>
+        
+        <form action="{{ route('groomer.fotos.cargar', $cita->id) }}" method="POST" enctype="multipart/form-data" class="mb-8 bg-gray-900/40 p-4 rounded-lg border border-gray-700 space-y-4">
+            @csrf
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="tipo_foto" class="block text-xs font-bold text-gray-400 uppercase">Progreso del Servicio</label>
+                    <select name="tipo_foto" id="tipo_foto" required class="w-full mt-1 bg-gray-900 border-gray-700 text-white rounded-md p-2.5 text-sm">
+                        <option value="antes">📸 Foto del Antes (Ingreso)</option>
+                        <option value="durante">📹 Foto del Durante (Proceso)</option>
+                        <option value="despues">✨ Foto del Después (Finalizado)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="fotos" class="block text-xs font-bold text-gray-400 uppercase">Subir Archivos de Imagen</label>
+                    <input type="file" name="fotos[]" id="fotos" multiple accept="image/*" required
+                           class="w-full mt-1 text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer bg-gray-900 border border-gray-700 rounded-md p-1">
+                </div>
+            </div>
+            <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded text-xs uppercase tracking-wider transition shadow">
+                📤 Subir Bloque de Fotos
             </button>
         </form>
 
-        <!-- Botón de cierre de servicio -->
-        @if($cita->estado === 'confirmada')
-        <div class="mt-8 pt-8 border-t border-gray-300">
-            <div class="bg-green-50 p-6 rounded-lg mb-4">
-                <h3 class="text-lg font-bold text-green-800 mb-2">✅ ¿Listo para cerrar el servicio?</h3>
-                <p class="text-gray-700 mb-4">
-                    Antes de cerrar, verifica que:
-                </p>
-                <ul class="list-disc list-inside text-gray-700 space-y-2">
-                    <li>Hayas completado al menos 3 ítems del checklist</li>
-                    <li>Hayas cargado fotos antes y después</li>
-                    <li>Hayas registrado las observaciones importantes</li>
-                    <li>Hayas registrado el uso de insumos</li>
-                </ul>
+        @if(count($fotos) > 0)
+            <div>
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Historial Fotográfico Cargado:</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    @foreach($fotos as $foto)
+                        <div class="bg-gray-900 p-2 rounded-lg border border-gray-700">
+                            <img src="{{ asset('storage/' . $foto['path']) }}" alt="Foto" class="w-full h-32 object-cover rounded shadow-inner">
+                            <div class="flex justify-between items-center mt-2 px-1 text-[10px]">
+                                <span class="px-2 py-0.5 rounded-full font-bold uppercase {{ $foto['tipo'] == 'despues' ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-300' }}">
+                                    {{ $foto['tipo'] }}
+                                </span>
+                                <span class="text-gray-500">{{ \Carbon\Carbon::parse($foto['fecha'])->format('d/m H:i') }}</span>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
             </div>
+        @else
+            <div class="bg-gray-900/50 p-6 rounded-lg text-center border border-dashed border-gray-700">
+                <p class="text-gray-400 text-sm">📸 No se han adjuntado fotos de evidencia para esta cita.</p>
+            </div>
+        @endif
+    </div>
 
-            <form action="{{ route('groomer.servicio.cerrar', $cita->id) }}" method="POST">
-                @csrf
-                <button type="submit" class="w-full px-6 py-4 bg-red-500 text-white font-bold text-lg rounded-lg hover:bg-red-600 transition"
-                        onclick="return confirm('¿Estás seguro de cerrar este servicio? Se notificará al cliente.')">
-                    🔒 CERRAR SERVICIO
-                </button>
-            </form>
-        </div>
-        @elseif($cita->estado === 'finalizado')
-        <div class="mt-8 p-6 bg-green-50 rounded-lg border-2 border-green-500">
-            <p class="text-lg font-bold text-green-800">✅ Este servicio ya ha sido finalizado</p>
-            <p class="text-gray-700 mt-2">El cliente ha sido notificado para el recojo.</p>
-        </div>
+    <div id="recomendaciones" class="tab-content bg-gray-800 rounded-lg shadow-md p-6 mb-6 hidden text-gray-200">
+        <h2 class="text-xl font-bold text-indigo-400 mb-4">💡 Indicaciones de Entrega</h2>
+        
+        @if($cita->estado === 'En Progreso')
+            <div class="bg-gray-900/60 p-6 rounded-lg border border-gray-700">
+                <h3 class="text-lg font-bold text-amber-400 mb-2">⚠️ Control de Cierre del Servicio</h3>
+                <p class="text-sm text-gray-400 mb-4 leading-relaxed">
+                    Al confirmar el cierre, el sistema guardará la sesión técnica, liberará tu disponibilidad en la agenda del spa y **enviará una alerta automática al correo electrónico del cliente** con el mensaje de "Listo para Recoger".
+                </p>
+                
+                <form action="{{ route('groomer.servicio.cerrar', $cita->id) }}" method="POST">
+                    @csrf
+                    <button type="submit" class="w-full px-6 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base rounded-lg transition transform hover:scale-[1.01] shadow shadow-emerald-900/50"
+                            onclick="return confirm('¿Confirmas que completaste el checklist mínimo y deseas finalizar el servicio de la mascota?')">
+                        🔒 CERRAR FICHA Y NOTIFICAR RECOJO
+                    </button>
+                </form>
+            </div>
+        @else
+            <div class="p-6 bg-emerald-900/30 rounded-lg border-2 border-emerald-600 text-center">
+                <p class="text-lg font-bold text-emerald-400">✅ Ficha Clínica de Atención Completada</p>
+                <p class="text-sm text-gray-400 mt-2">El servicio concluyó exitosamente. La mascota se encuentra lista en el mostrador de recepción.</p>
+                <a href="{{ route('groomer.agenda') }}" class="inline-block mt-4 text-xs bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded font-bold transition">
+                    ⬅ Volver a mi agenda de trabajo
+                </a>
+            </div>
         @endif
     </div>
 </div>
 
-<!-- Script para tabs -->
 <script>
 function activeTab(tabName) {
-    // Ocultar todos los tabs
+    // Ocultar todos los contenidos de las pestañas
     const tabs = document.querySelectorAll('.tab-content');
     tabs.forEach(tab => tab.classList.add('hidden'));
     
-    // Mostrar el tab seleccionado
-    document.getElementById(tabName).classList.remove('hidden');
-    
-    // Actualizar estado del botón
+    // Quitar estados activos de todos los botones
     const buttons = document.querySelectorAll('.tab-button');
     buttons.forEach(btn => {
-        btn.classList.remove('border-b-2', 'border-blue-500');
-        btn.classList.add('border-transparent');
+        btn.classList.remove('text-indigo-400', 'border-indigo-500');
+        btn.classList.add('text-gray-400', 'border-transparent');
     });
-    event.target.classList.add('border-b-2', 'border-blue-500');
-}
 
-function toggleCheckbox(id) {
-    const checkbox = document.getElementById(id);
-    checkbox.checked = !checkbox.checked;
+    // Activar la pestaña elegida por ID
+    document.getElementById(tabName).classList.remove('hidden');
+    
+    // Marcar el botón presionado como activo
+    event.currentTarget.classList.remove('text-gray-400', 'border-transparent');
+    event.currentTarget.classList.add('text-indigo-400', 'border-indigo-500');
 }
 </script>
-
 @endsection

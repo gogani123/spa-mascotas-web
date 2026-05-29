@@ -61,9 +61,14 @@ class GroomerController extends Controller
         $cita = Cita::findOrFail($citaId);
         $groomer = Auth::user();
 
-        // Validar permisos
+        // Validar permisos de seguridad operativa
         if ($groomer->rol_id != 3 || $cita->groomer_id != $groomer->id) {
             abort(403, 'Acceso denegado.');
+        }
+
+        // REGLA DE NEGOCIO: Al abrir la ficha, la cita pasa automáticamente a "En Progreso"
+        if ($cita->estado === 'Confirmada') {
+            $cita->update(['estado' => 'En Progreso']);
         }
 
         $ficha = $cita->fichaGrooming ?? new FichaGrooming();
@@ -85,14 +90,13 @@ class GroomerController extends Controller
     }
 
     /**
-     * Guardar o actualizar ficha técnica
+     * Guardar o actualizar ficha técnica básica
      */
     public function guardarFicha(Request $request, $citaId)
     {
         $cita = Cita::findOrFail($citaId);
         $groomer = Auth::user();
 
-        // Validar permisos
         if ($groomer->rol_id != 3 || $cita->groomer_id != $groomer->id) {
             abort(403, 'Acceso denegado.');
         }
@@ -114,7 +118,7 @@ class GroomerController extends Controller
     }
 
     /**
-     * Registrar checklist de tareas
+     * Registrar checklist de tareas (BUG CORREGIDO)
      */
     public function guardarChecklist(Request $request, $citaId)
     {
@@ -125,12 +129,14 @@ class GroomerController extends Controller
             abort(403, 'Acceso denegado.');
         }
 
+        // Capturamos el array de elementos marcados enviado por el formulario
         $checklist = $request->get('checklist', []);
 
-        // Validar que al menos 3 items estén marcados (mínimo obligatorio)
-        $completados = count(array_filter($checklist, fn($item) => $item === true));
+        // CORRECCIÓN DEL BUG: Contamos cuántas casillas fueron enviadas como marcadas
+        $completados = count($checklist);
+        
         if ($completados < 3) {
-            return back()->withErrors(['error' => '❌ Debes marcar al menos 3 ítems del checklist.']);
+            return back()->withErrors(['error' => '❌ Módulo Grooming: Debes marcar al menos 3 ítems del checklist para registrar el avance técnico.']);
         }
 
         $ficha = $cita->fichaGrooming ?? new FichaGrooming();
@@ -155,17 +161,15 @@ class GroomerController extends Controller
 
         $validated = $request->validate([
             'fotos' => 'required|array|min:1|max:10',
-            'fotos.*' => 'image|mimes:jpeg,png,jpg,gif|max:5120', // Max 5MB
+            'fotos.*' => 'image|mimes:jpeg,png,jpg,gif|max:5120', 
             'tipo_foto' => 'required|in:antes,durante,despues',
         ]);
 
         $ficha = $cita->fichaGrooming ?? new FichaGrooming();
         $ficha->cita_id = $citaId;
 
-        // Recuperar fotos existentes
         $fotosExistentes = $ficha->fotos_json ? json_decode($ficha->fotos_json, true) : [];
 
-        // Guardar nuevas fotos
         foreach ($request->file('fotos') as $foto) {
             $path = $foto->store("citas/{$citaId}", 'public');
             $fotosExistentes[] = [
@@ -178,7 +182,7 @@ class GroomerController extends Controller
         $ficha->fotos_json = json_encode($fotosExistentes);
         $ficha->save();
 
-        return back()->with('success', '✅ Fotos cargadas correctamente.');
+        return back()->with('success', '✅ Evidencia fotográfica cargada correctamente.');
     }
 
     /**
@@ -234,7 +238,7 @@ class GroomerController extends Controller
     }
 
     /**
-     * Cerrar servicio (validar y finalizar)
+     * Cerrar servicio (CORREGIDO CON ESTADO 'Completada')
      */
     public function cerrarServicio(Request $request, $citaId)
     {
@@ -247,16 +251,16 @@ class GroomerController extends Controller
 
         $ficha = $cita->fichaGrooming;
 
-        // Validar que la ficha esté completa
+        // Regla de Negocio: Validar checklist antes de cerrar la hoja
         if (!$ficha || !$ficha->checklist_json) {
-            return back()->withErrors(['error' => '❌ Debes completar el checklist antes de cerrar el servicio.']);
+            return back()->withErrors(['error' => '❌ Restricción: No se puede cerrar la ficha sin completar el checklist técnico.']);
         }
 
-        // Cambiar estado de cita a 'finalizado'
-        $cita->estado = 'finalizado';
+        // CORRECCIÓN: Ajustado al estado exacto del documento de base de datos
+        $cita->estado = 'Completada'; 
         $cita->save();
 
-        // Descontar automáticamente insumos del inventario
+        // Descontar automáticamente insumos del inventario global
         $salidaInsumos = SalidaInsumo::where('cita_id', $citaId)->get();
         foreach ($salidaInsumos as $salida) {
             if ($salida->estado === 'usado' || $salida->estado === 'desperdiciado') {
@@ -266,10 +270,10 @@ class GroomerController extends Controller
             }
         }
 
-        // Notificar al cliente que está listo para recoger
+        // Disparar evento de notificación en tiempo real
         NotificacionService::notificarListoParaRecoger($cita);
 
-        return back()->with('success', '✅ Servicio cerrado exitosamente. El cliente ha sido notificado.');
+        return back()->with('success', '✨ ¡Servicio cerrado con éxito! El inventario fue actualizado y el cliente recibió la notificación de recojo.');
     }
 
     /**

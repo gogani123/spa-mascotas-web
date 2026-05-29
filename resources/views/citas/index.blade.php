@@ -64,11 +64,14 @@
                                     <tbody class="divide-y divide-gray-700 bg-gray-800">
                                         @foreach($proximas as $cita)
                                             <tr class="hover:bg-gray-750 transition-colors">
-                                                <td class="px-4 py-3 font-bold">{{ \Carbon\Carbon::parse($cita->fecha)->format('d/m/Y') }} <span class="text-xs text-indigo-300 font-normal">({{ $cita->hora_inicio }})</span></td>
+                                                <td class="px-4 py-3 font-bold">
+                                                    {{ \Carbon\Carbon::parse($cita->fecha)->format('d/m/Y') }} 
+                                                    <span class="text-xs text-indigo-300 font-normal">({{ $cita->hora_inicio }})</span>
+                                                </td>
                                                 <td class="px-4 py-3">{{ $cita->mascota->nombre ?? 'N/A' }}</td>
                                                 <td class="px-4 py-3">{{ $cita->servicio->nombre ?? 'N/A' }}</td>
                                                 <td class="px-4 py-3 text-center">
-                                                    <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $cita->estado == 'Confirmada' ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300' }}">
+                                                    <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $cita->estado == 'Confirmada' ? 'bg-green-900 text-green-300' : ($cita->estado == 'Cancelada' ? 'bg-red-900 text-red-300' : 'bg-yellow-900 text-yellow-300') }}">
                                                         {{ $cita->estado }}
                                                     </span>
                                                 </td>
@@ -149,55 +152,62 @@
                                             
                                             @if(Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2)
                                                 <td class="px-4 py-4 border-l border-gray-700">
-                                                    <div class="flex items-center justify-center gap-3">
+                                                    <div class="flex items-center justify-center gap-2">
                                                         
-                                                        @if($cita->estado == 'Pendiente')
-                                                            <form action="{{ route('citas.aprobar', $cita->id) }}" method="POST" class="inline">
+                                                        @if($cita->estado === 'Pendiente' || $cita->estado === 'Confirmada')
+                                                            
+                                                            @if($cita->estado === 'Pendiente')
+                                                                <form action="{{ route('citas.aprobar', $cita->id) }}" method="POST" class="inline">
+                                                                    @csrf
+                                                                    <button type="submit" class="bg-green-600 hover:bg-green-500 text-white font-bold py-1 px-2.5 rounded text-xs transition shadow">
+                                                                        Aprobar
+                                                                    </button>
+                                                                </form>
+                                                            @endif
+
+                                                            <a href="{{ route('citas.calendario') }}" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md font-bold shadow-md transition-all">
+                                                                Reprogramar
+                                                            </a>
+
+                                                            <form action="{{ route('citas.cancelar', $cita->id) }}" method="POST" class="inline-flex items-center gap-1 bg-gray-900 p-1 rounded border border-gray-700">
                                                                 @csrf
-                                                                <button type="submit" class="text-xs bg-yellow-600 hover:bg-yellow-500 text-white px-3.5 py-1.5 rounded-full font-medium shadow-md transition-all duration-150 transform hover:-translate-y-0.5">
-                                                                    Aprobar
+                                                                <select name="motivo_cancelacion" required class="bg-gray-900 border-0 text-white text-xs rounded p-1 cursor-pointer h-7">
+                                                                    <option value="" disabled selected>Motivo...</option>
+                                                                    <option value="Salud">🏥 Salud</option>
+                                                                    <option value="Tiempo">⏰ Tiempo</option>
+                                                                    <option value="Emergencia">🚨 Emergencia</option>
+                                                                    <option value="Otros">📝 Otros</option>
+                                                                </select>
+                                                                <button type="submit" class="bg-red-600 hover:bg-red-500 text-white font-bold h-7 px-2 rounded text-xs transition" onclick="return confirm('¿Seguro que deseas cancelar esta cita?')">
+                                                                    Cancelar
                                                                 </button>
                                                             </form>
-                                                        @endif
 
-                                                        @if($cita->estado == 'Confirmada')
-                                                            @php
-                                                                $mensaje = urlencode("🐾 ¡Hola " . ($cita->cliente->name ?? '') . "! Te escribimos del Spa para confirmar la cita de *" . ($cita->mascota->nombre ?? '') . "* para el día " . \Carbon\Carbon::parse($cita->fecha)->format('d/m/Y') . " a las " . $cita->hora_inicio . " hrs. Servicio: " . ($cita->servicio->nombre ?? '') . ". ¡Te esperamos!");
-                                                                $whatsappUrl = "https://wa.me/59170000000?text={$mensaje}";
-                                                            @endphp
-                                                            <a href="{{ $whatsappUrl }}" target="_blank" class="text-xs bg-green-500 hover:bg-green-400 text-white px-3.5 py-1.5 rounded-full font-medium shadow-md transition-all duration-150 flex items-center gap-1">
-                                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-                                                                Notificar
-                                                            </a>
-                                                        @endif
+                                                        @elseif($cita->estado === 'Cancelada')
+                                                            <span class="text-xs text-red-400 bg-red-950/40 border border-red-900 px-3 py-1 rounded-md italic">
+                                                                🚫 Motivo: {{ $cita->motivo_cancelacion ?? 'No especificado' }}
+                                                            </span>
 
-                                                        <a href="{{ route('citas.calendario') }}" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded-full font-medium shadow-md transition-all duration-150 transform hover:-translate-y-0.5">
-                                                            Reprogramar
-                                                        </a>
-
-                                                        @if($cita->estado_pago == 'Pendiente')
-                                                            <a href="{{ route('citas.cobrar', $cita->id) }}" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-full font-medium shadow-md transition-all duration-150 transform hover:-translate-y-0.5">
-                                                                Cobrar
-                                                            </a>
-                                                        @else
-                                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-900/50 px-3 py-1.5 text-xs font-semibold text-emerald-300 ring-1 ring-inset ring-emerald-700 shadow-sm">
-                                                                Pagado
+                                                        @elseif($cita->estado === 'Completada')
+                                                            <span class="text-xs bg-gray-900 text-indigo-300 border border-indigo-900 px-3 py-1 rounded-md font-bold uppercase tracking-wider">
+                                                                ✨ Servicio Terminado
                                                             </span>
                                                         @endif
+
                                                     </div>
                                                 </td>
                                             @endif
 
                                             @if(Auth::user()->rol_id == 3)
                                                 <td class="px-4 py-4 text-center border-l border-gray-700">
-                                                    @if($cita->estado == 'Confirmada')
-                                                        <a href="{{ route('citas.atender', $cita->id) }}" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-full font-bold shadow-md transition-all hover:shadow-lg inline-block">
+                                                    @if($cita->estado == 'Confirmada' || $cita->estado == 'En Progreso')
+                                                        <a href="{{ route('groomer.ficha.panel', $cita->id) }}" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-full font-bold shadow-md transition-all inline-block">
                                                             ✂️ Atender Mascota
                                                         </a>
                                                     @elseif($cita->estado == 'Completada')
                                                         <span class="text-xs bg-gray-700 text-indigo-300 px-3 py-1.5 rounded-full border border-indigo-900 font-bold">✨ Completado</span>
                                                     @else
-                                                        <span class="text-xs text-gray-500 italic">Pendiente de Recepción</span>
+                                                        <span class="text-xs text-gray-500 italic">No disponible ({{ $cita->estado }})</span>
                                                     @endif
                                                 </td>
                                             @endif
@@ -208,7 +218,7 @@
                             </table>
                         </div>
                     @endif
-                    @endif
+                @endif
             </div>
         </div>
     </div>

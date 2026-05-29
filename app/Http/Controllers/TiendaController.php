@@ -72,4 +72,50 @@ class TiendaController extends Controller
         session()->forget('descuento'); // Borramos el descuento también
         return redirect()->back()->with('success', 'El carrito ha sido vaciado.');
     }
+    // ====================================================================
+    // REGISTRO DE VENTA PRESENCIAL Y DESCUENTO DE STOCK (Punto 5.2 del Doc)
+    // ====================================================================
+    public function comprarPresencial(Request $request)
+    {
+        // 1. Validar que el método de pago sea uno de los 3 oficiales del documento
+        $request->validate([
+            'metodo_pago' => 'required|string|in:Efectivo,QR,Transferencia'
+        ]);
+
+        $carrito = session()->get('carrito', []);
+
+        if (empty($carrito)) {
+            return back()->withErrors(['error' => 'El carrito está vacío.']);
+        }
+
+        // 2. Iniciar una transacción de Base de Datos para asegurar consistencia
+        DB::beginTransaction();
+        try {
+            foreach ($carrito as $id => $item) {
+                // Buscamos el producto en la BD para verificar el stock actual
+                $producto = DB::table('productos')->where('id', $id)->first();
+                
+                if (!$producto || $producto->stock < $item['cantidad']) {
+                    DB::rollBack();
+                    return back()->withErrors(['error' => "❌ Stock insuficiente en BD para: " . ($producto->nombre ?? 'Producto')]);
+                }
+
+                // 3. Descontar automáticamente del inventario el stock global vendido
+                DB::table('productos')->where('id', $id)->decrement('stock', $item['cantidad']);
+            }
+
+            // Guardamos los cambios de stock de forma permanente
+            DB::commit();
+
+            // 4. Limpiar la sesión para dejar la caja lista para el siguiente cliente
+            session()->forget('carrito');
+            session()->forget('descuento');
+
+            return redirect()->route('tienda.index')->with('success', '💵 ¡Venta registrada con éxito en el sistema! El stock de los productos ha sido actualizado.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withErrors(['error' => 'Error crítico al procesar el inventario: ' . $e->getMessage()]);
+        }
+    }
 }

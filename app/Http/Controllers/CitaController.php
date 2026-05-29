@@ -42,13 +42,12 @@ class CitaController extends Controller
     }
 
     // Función para mostrar el formulario de Agendar
-    // Función para mostrar el formulario de Agendar
     public function create()
     {
         $servicios = Servicio::orderBy('nombre', 'asc')->get();
         $usuario = Auth::user();
         
-        // NUEVO: Traemos a los groomers para que el cliente pueda elegir su preferencia
+        // Traemos a los groomers para que el cliente pueda elegir su preferencia
         $groomers = User::where('rol_id', 3)->get(); 
 
         if ($usuario->rol_id == 1 || $usuario->rol_id == 2) {
@@ -57,150 +56,102 @@ class CitaController extends Controller
             $mascotas = Mascota::where('user_id', $usuario->id)->get();
         }
 
-        // Agregamos 'groomers' al compact
         return view('citas.create', compact('servicios', 'mascotas', 'groomers')); 
     }
 
-    // Función que guarda la cita, calcula tiempos, valida bloqueos y TURNOS (Mañana, Tarde, Completo)
     public function store(Request $request)
     {
-        $rules = [
-            'mascota_id' => 'required|exists:mascotas,id',
+        // 1. Validaciones iniciales del formulario
+        $request->validate([
+            'mascota_id'  => 'required|exists:mascotas,id',
             'servicio_id' => 'required|exists:servicios,id',
-            'fecha' => 'required|date|after_or_equal:today',
+            'groomer_id'  => 'required|exists:users,id',
+            'fecha'       => 'required|date|after_or_equal:today',
             'hora_inicio' => 'required|date_format:H:i',
-        ];
-
-        if (Auth::user()->rol_id == 1 || Auth::user()->rol_id == 2) {
-            $rules['groomer_id'] = 'required|exists:users,id';
-        }
-
-        $request->validate($rules);
-
-        $servicio = Servicio::findOrFail($request->servicio_id);
-        $mascota = Mascota::findOrFail($request->mascota_id);
-        
-        // Ajuste de tiempos
-        $duracion_calculada = $servicio->duracion_base;
-        if ($mascota->tamano == 'Mediana') { $duracion_calculada += ($servicio->duracion_base * 0.10); } 
-        elseif ($mascota->tamano == 'Grande') { $duracion_calculada += ($servicio->duracion_base * 0.15); } 
-        elseif ($mascota->tamano == 'Gigante' || $mascota->tamano == 'Raza Compleja') { $duracion_calculada += ($servicio->duracion_base * 0.30); }
-
-        if ($mascota->comportamiento == 'Nerviosa' || $mascota->comportamiento == 'Agresiva') { $duracion_calculada += 20; }
-
-        $duracion_final = round($duracion_calculada);
-        $hora_inicio = Carbon::parse($request->hora_inicio);
-        $hora_fin = $hora_inicio->copy()->addMinutes($duracion_final);
-
-        // Escudo de Bloqueos (Feriados)
-        $diaBloqueado = Bloqueo::where('fecha', $request->fecha)
-            ->where(function($query) use ($hora_inicio, $hora_fin) {
-                $query->where('todo_el_dia', true)
-                ->orWhere(function($q) use ($hora_inicio, $hora_fin) {
-                    $q->where('todo_el_dia', false)
-                    ->where(function($sub) use ($hora_inicio, $hora_fin) {
-                        $sub->whereBetween('hora_inicio', [$hora_inicio->format('H:i'), $hora_fin->format('H:i')])
-                            ->orWhereBetween('hora_fin', [$hora_inicio->format('H:i'), $hora_fin->format('H:i')])
-                            ->orWhere(function($sub2) use ($hora_inicio, $hora_fin) {
-                                $sub2->where('hora_inicio', '<=', $hora_inicio->format('H:i'))->where('hora_fin', '>=', $hora_fin->format('H:i'));
-                            });
-                    });
-                });
-            })->exists();
-
-        if ($diaBloqueado) {
-            return back()->withErrors(['error' => '❌ No se puede agendar: Este horario o día completo se encuentra bloqueado por la Administración.']);
-        }
-
-        // ====================================================================
-        // ASIGNACIÓN Y VALIDACIÓN EXACTA DE LOS 3 TURNOS (Punto 3.1)
-        // ====================================================================
-        $groomer_final_id = null;
-        $hora_inicio_num = (int) $hora_inicio->format('H'); // Ej: Las 08:30 se convierte en 8. Las 14:30 en 14.
-
-        if ($request->has('groomer_id') && $request->groomer_id != null) {
-            $groomer_final_id = $request->groomer_id;
-            $groomer_elegido = User::find($groomer_final_id);
-            $turno = $groomer_elegido->turno;
-
-            // 1. VALIDACIÓN ESTRICTA DEL TURNO LABORAL
-            // Si el turno es 'Completo', no entra en estas validaciones y pasa directo
-            if ($turno == 'Mañana' && $hora_inicio_num >= 14) {
-                return back()->withErrors(['error' => "❌ {$groomer_elegido->name} trabaja turno 'Mañana' (08:00 - 13:30). No puedes asignarle citas en la tarde."]);
-            }
-            if ($turno == 'Tarde' && $hora_inicio_num < 14) {
-                return back()->withErrors(['error' => "❌ {$groomer_elegido->name} trabaja turno 'Tarde' (14:00 - 19:30). No puedes asignarle citas en la mañana."]);
-            }
-
-            // 2. VALIDAR CHOQUE DE HORARIOS
-            $choque = Cita::where('groomer_id', $groomer_final_id)->where('fecha', $request->fecha)
-                ->where(function($query) use ($hora_inicio, $hora_fin) {
-                    $query->whereBetween('hora_inicio', [$hora_inicio->format('H:i'), $hora_fin->format('H:i')])
-                        ->orWhereBetween('hora_fin', [$hora_inicio->format('H:i'), $hora_fin->format('H:i')])
-                        ->orWhere(function($q) use ($hora_inicio, $hora_fin) {
-                            $q->where('hora_inicio', '<=', $hora_inicio->format('H:i'))->where('hora_fin', '>=', $hora_fin->format('H:i'));
-                        });
-                })->exists();
-
-            if ($choque) {
-                return back()->withErrors(['error' => "❌ {$groomer_elegido->name} ya tiene una cita en esa franja horaria. Elige otra hora u otro profesional."]);
-            }
-        } else {
-            // SI ES CLIENTE AUTOGESTIONANDO: Busca automáticamente un groomer
-            $groomers = User::where('rol_id', 3)->get();
-            foreach ($groomers as $groomer) {
-                
-                // Si la cita está fuera del turno laboral de este groomer, lo saltamos y probamos con el siguiente
-                if ($groomer->turno == 'Mañana' && $hora_inicio_num >= 14) continue;
-                if ($groomer->turno == 'Tarde' && $hora_inicio_num < 14) continue;
-                // Si es 'Completo', simplemente no lo salta y continúa
-
-                $choque = Cita::where('groomer_id', $groomer->id)->where('fecha', $request->fecha)
-                    ->where(function($query) use ($hora_inicio, $hora_fin) {
-                        $query->whereBetween('hora_inicio', [$hora_inicio->format('H:i'), $hora_fin->format('H:i')])
-                            ->orWhereBetween('hora_fin', [$hora_inicio->format('H:i'), $hora_fin->format('H:i')])
-                            ->orWhere(function($q) use ($hora_inicio, $hora_fin) {
-                                $q->where('hora_inicio', '<=', $hora_inicio->format('H:i'))->where('hora_fin', '>=', $hora_fin->format('H:i'));
-                            });
-                    })->exists();
-
-                if (!$choque) {
-                    $groomer_final_id = $groomer->id;
-                    break; 
-                }
-            }
-        }
-
-        if (!$groomer_final_id) {
-            return back()->withErrors(['error' => 'No hay personal disponible en ese horario (Fuera de turno o con agenda llena). Elige otra hora.']);
-        }
-
-        $estado_inicial = (Auth::user()->rol_id == 4) ? 'Pendiente' : 'Confirmada';
-
-        $cita = Cita::create([
-            'cliente_id' => $mascota->user_id, 
-            'mascota_id' => $request->mascota_id,
-            'servicio_id' => $servicio->id,
-            'groomer_id' => $groomer_final_id,
-            'fecha' => $request->fecha,
-            'hora_inicio' => $hora_inicio->format('H:i'),
-            'hora_fin' => $hora_fin->format('H:i'),
-            'estado' => $estado_inicial,
         ]);
 
-        // Disparar notificación cuando cliente solicita cita
-        if (Auth::user()->rol_id == 4) {
-            NotificacionService::notificarSolicitudEnRevision($cita);
-        } else {
-            // Si es admin/recepción, la cita se crea directamente confirmada
-            NotificacionService::notificarCitaConfirmada($cita);
+        // 2. Obtener los modelos de la base de datos
+        $servicio = \App\Models\Servicio::findOrFail($request->servicio_id);
+        $mascota  = \App\Models\Mascota::findOrFail($request->mascota_id);
+
+        // 3. ALGORITMO: Calcular duración exacta en base a la mascota (Punto 1 y 2 de la Rúbrica)
+        $duracionTotal = $servicio->duracion_minutos ?? 45; 
+
+        // Incremento por tamaño
+        $tamanoMascota = $mascota->tamano ?? $mascota->tamaño ?? 'Pequeño';
+        if ($tamanoMascota === 'Mediano') { $duracionTotal += 10; }
+        elseif ($tamanoMascota === 'Grande') { $duracionTotal += 15; }
+        elseif ($tamanoMascota === 'Gigante') { $duracionTotal += 30; }
+
+        // Incremento por comportamiento/temperamento
+        if ($mascota->comportamiento === 'Nervioso' || $mascota->comportamiento === 'Agresivo') {
+            $duracionTotal += 20; 
         }
 
-        return redirect()->back()->with('success', '¡Cita agendada exitosamente! El sistema verificó la disponibilidad y el turno del profesional.');
+        // 4. Calcular hora_fin exacta
+        $horaInicioCarbon = \Carbon\Carbon::createFromFormat('H:i', $request->hora_inicio);
+        $horaFinCarbon    = clone $horaInicioCarbon;
+        $horaFinCarbon->addMinutes($duracionTotal);
+
+        $hora_inicio_str = $horaInicioCarbon->format('H:i:s');
+        $hora_fin_str    = $horaFinCarbon->format('H:i:s');
+
+        // 5. ALGORITMO ANTI-CRUCE: Verificar si el Groomer ya tiene un espacio ocupado
+        $cruceCita = \App\Models\Cita::where('groomer_id', $request->groomer_id)
+            ->where('fecha', $request->fecha)
+            ->where('estado', '!=', 'Cancelada') 
+            ->where(function ($query) use ($hora_inicio_str, $hora_fin_str) {
+                $query->where('hora_inicio', '<', $hora_fin_str)
+                      ->where('hora_fin', '>', $hora_inicio_str);
+            })
+            ->first();
+
+        if ($cruceCita) {
+            return back()->withInput()->withErrors([
+                'hora_inicio' => "🚫 El estilista (Groomer) seleccionado ya tiene una cita agendada de {$cruceCita->hora_inicio} a {$cruceCita->hora_fin}. Por favor, elige otro horario."
+            ]);
+        }
+
+        // ====================================================================
+        // CORRECCIÓN DEFINITIVA: VALIDACIÓN DE SHIFT/TURNO INMUNE A CASING
+        // ====================================================================
+        $groomerObj = \App\Models\User::with('groomer')->find($request->groomer_id);
+        $turnoRaw = $groomerObj->turno ?? ($groomerObj->groomer->turno ?? 'completo');
+        
+        // Convertimos a minúsculas y limpiamos espacios para evitar fallas de tipeo
+        $turnoNormalized = strtolower(trim($turnoRaw));
+        $horaComparar = \Carbon\Carbon::parse($hora_inicio_str)->format('H:i');
+
+        if (($turnoNormalized === 'mañana' || $turnoNormalized === 'manana') && $horaComparar >= '13:00') {
+            return back()->withInput()->withErrors([
+                'hora_inicio' => "🛑 Operación rechazada: El estilista seleccionado trabaja únicamente en el turno de la Mañana (09:00 a 13:00)."
+            ]);
+        }
+
+        if ($turnoNormalized === 'tarde' && $horaComparar < '14:00') {
+            return back()->withInput()->withErrors([
+                'hora_inicio' => "🛑 Operación rechazada: El estilista seleccionado trabaja únicamente en el turno de la Tarde (14:00 a 18:00)."
+            ]);
+        }
+        // ====================================================================
+
+        // 6. Crear la cita en la base de datos PostgreSQL
+        \App\Models\Cita::create([
+            'cliente_id'  => auth()->user()->rol_id == 4 ? auth()->id() : ($mascota->user_id ?? $mascota->cliente_id),
+            'mascota_id'  => $request->mascota_id,
+            'servicio_id' => $request->servicio_id,
+            'groomer_id'  => $request->groomer_id,
+            'fecha'       => $request->fecha,
+            'hora_inicio' => $hora_inicio_str,
+            'hora_fin'    => $hora_fin_str,
+            'estado'      => auth()->user()->rol_id == 4 ? 'Pendiente' : 'Confirmada', 
+            'total'       => $servicio->precio, 
+        ]);
+
+        return redirect()->route('citas.index')->with('success', '📅 ¡Cita agendada correctamente! El sistema calculó el espacio de tiempo necesario de forma automática.');
     }
     
     // MÓDULO DE COBRANZA (PUNTO 3.1)
-    
     public function cobrar(Cita $cita)
     {
         return view('citas.cobrar', compact('cita'));
@@ -221,7 +172,6 @@ class CitaController extends Controller
     }
 
     // CALENDARIO INTERACTIVO (PUNTO 3.1)
-
     public function calendario()
     {
         return view('citas.calendario');
@@ -261,9 +211,6 @@ class CitaController extends Controller
         return response()->json(['success' => true]);
     }
 
-    // A
-        // Disparar notificación cuando recepción confirma la cita
-        //NotificacionService::notificarCitaConfirmada($cita);
     public function aprobar(Cita $cita)
     {
         if (Auth::user()->rol_id == 4) {
@@ -274,8 +221,6 @@ class CitaController extends Controller
         return redirect()->back()->with('success', '¡Cita de ' . $cita->mascota->nombre . ' aprobada correctamente!');
     }
 
-    // MÓDULO DEL GROOMER (PUNTO 3.3)
-
     public function atender(Cita $cita)
     {
         if (Auth::user()->rol_id == 3 && $cita->groomer_id != Auth::user()->id) {
@@ -283,21 +228,17 @@ class CitaController extends Controller
         }
         return view('citas.atender', compact('cita'));
     }
-    // ====================================================================
-    // MÓDULO DE GROOMING: FINALIZAR SERVICIO Y GUARDAR FICHA (PUNTO 3.2)
-    // ====================================================================
+
     public function completar(Request $request, $id)
     {
         $cita = \App\Models\Cita::findOrFail($id);
 
-        // 1. Validar los datos que vienen de tu formulario
         $request->validate([
             'estado_inicial' => 'required|string',
             'foto_antes'     => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'foto_despues'   => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        // 2. Subir las fotos a la carpeta "storage/app/public/grooming"
         $rutaAntes = null;
         if ($request->hasFile('foto_antes')) {
             $rutaAntes = $request->file('foto_antes')->store('grooming', 'public');
@@ -308,7 +249,6 @@ class CitaController extends Controller
             $rutaDespues = $request->file('foto_despues')->store('grooming', 'public');
         }
 
-        // 3. Empacar el checklist y los insumos en un solo paquete JSON
         $datosJson = [
             'tareas'  => $request->checklist ?? [],
             'insumos' => [
@@ -318,9 +258,8 @@ class CitaController extends Controller
             ]
         ];
 
-        // 4. Guardar todo en la tabla fichas_grooming
         \App\Models\FichaGrooming::updateOrCreate(
-            ['cita_id' => $cita->id], // Busca si ya existe una ficha para esta cita
+            ['cita_id' => $cita->id], 
             [
                 'estado_ingreso' => $request->estado_inicial,
                 'checklist_json' => json_encode($datosJson),
@@ -329,10 +268,117 @@ class CitaController extends Controller
             ]
         );
 
-        // 5. Cambiar el estado de la cita
-        $cita->update(['estado' => 'Completada']); // o 'Finalizada'
+        $cita->update(['estado' => 'Completada']);
 
-        // 6. Volver a la agenda con un mensaje de éxito
         return redirect()->route('citas.index')->with('success', '¡Servicio cerrado exitosamente! La ficha técnica y las fotos han sido guardadas.');
+    }
+
+    // ====================================================================
+    // ENDPOINT DE DISPONIBILIDAD CON CAZADOR DE ERRORES INTERNOS
+    // ====================================================================
+    public function obtenerHorariosDisponibles(Request $request)
+    {
+        try {
+            $request->validate([
+                'fecha' => 'required|date',
+                'groomer_id' => 'required|exists:users,id',
+                'mascota_id' => 'required|exists:mascotas,id',
+                'servicio_id' => 'required|exists:servicios,id',
+            ]);
+
+            // Carga limpia del usuario
+            $groomer = \App\Models\User::find($request->groomer_id);
+            $fecha = $request->fecha;
+
+            $horaInicioEnv = '09:00';
+            $horaFinEnv = '18:00';
+
+            // Extracción ultra segura del turno soportando ambas estructuras de tablas
+            $turnoRaw = $groomer->turno ?? 'completo';
+            if (isset($groomer->groomer) && isset($groomer->groomer->turno)) {
+                $turnoRaw = $groomer->groomer->turno;
+            }
+            
+            $turnoNormalized = strtolower(trim($turnoRaw));
+
+            if ($turnoNormalized === 'mañana' || $turnoNormalized === 'manana') { 
+                $horaFinEnv = '13:00'; 
+            }
+            if ($turnoNormalized === 'tarde') { 
+                $horaInicioEnv = '14:00'; 
+            }
+
+            $inicio = \Carbon\Carbon::createFromFormat('H:i', $horaInicioEnv);
+            $fin = \Carbon\Carbon::createFromFormat('H:i', $horaFinEnv);
+
+            $servicio = \App\Models\Servicio::find($request->servicio_id);
+            $mascota = \App\Models\Mascota::find($request->mascota_id);
+            
+            // INTELIGENCIA COMPARTIDA: Lee 'duracion_base' o 'duracion_minutos' según tu migración
+            $duracion = $servicio->duracion_base ?? $servicio->duracion_minutos ?? 45;
+
+            // Soporta tanto 'tamano' como 'tamaño' con la letra Ñ
+            $tamanoMascota = $mascota->tamano ?? $mascota->tamaño ?? 'Pequeño'; 
+
+            if ($tamanoMascota === 'Mediano') { $duracion += 10; }
+            elseif ($tamanoMascota === 'Grande') { $duracion += 15; }
+            elseif ($tamanoMascota === 'Gigante') { $duracion += 30; }
+
+            if ($mascota->comportamiento === 'Nervioso' || $mascota->comportamiento === 'Agresivo') { $duracion += 20; }
+
+            $citasOcupadas = \App\Models\Cita::where('groomer_id', $groomer->id)
+                ->where('fecha', $fecha)
+                ->where('estado', '!=', 'Cancelada')
+                ->get();
+
+            $slotsDisponibles = [];
+
+            while ($inicio->copy()->addMinutes($duracion)->lessThanOrEqualTo($fin)) {
+                $slotInicio = $inicio->format('H:i:s');
+                $slotFin = $inicio->copy()->addMinutes($duracion)->format('H:i:s');
+
+                $cruza = false;
+                foreach ($citasOcupadas as $cita) {
+                    if ($slotInicio < $cita->hora_fin && $slotFin > $cita->hora_inicio) {
+                        $cruza = true;
+                        break;
+                    }
+                }
+
+                if (!$cruza) {
+                    $slotsDisponibles[] = $inicio->format('H:i');
+                }
+
+                $inicio->addMinutes(30); 
+            }
+
+            return response()->json([
+                'turno' => ucfirst($turnoNormalized), 
+                'horarios' => $slotsDisponibles
+            ]);
+
+        } catch (\Exception $e) {
+            // Captura el fallo exacto de la base de datos y lo envía al navegador
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // ====================================================================
+    // NUEVO MÉTODO: CANCELAR CITA CON MOTIVO OBLIGATORIO (Punto 4.3)
+    // ====================================================================
+    public function cancelar(Request $request, $id)
+    {
+        $request->validate([
+            'motivo_cancelacion' => 'required|string|in:Salud,Tiempo,Emergencia,Otros',
+        ]);
+
+        $cita = \App\Models\Cita::findOrFail($id);
+
+        $cita->update([
+            'estado' => 'Cancelada',
+            'motivo_cancelacion' => $request->motivo_cancelacion
+        ]);
+
+        return back()->with('success', '🚫 La cita ha sido cancelada y el espacio fue liberado en la agenda.');
     }
 }
