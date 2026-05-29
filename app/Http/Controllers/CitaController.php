@@ -211,7 +211,6 @@ class CitaController extends Controller
         return response()->json(['success' => true]);
     }
 
-    // APROBACIONES (PUNTO 3.2)
     public function aprobar(Cita $cita)
     {
         if (Auth::user()->rol_id == 4) {
@@ -219,10 +218,6 @@ class CitaController extends Controller
         }
 
         $cita->update(['estado' => 'Confirmada']);
-
-        // Disparar notificación cuando recepción confirma la cita
-        NotificacionService::notificarCitaConfirmada($cita);
-
         return redirect()->back()->with('success', '¡Cita de ' . $cita->mascota->nombre . ' aprobada correctamente!');
     }
 
@@ -291,12 +286,14 @@ class CitaController extends Controller
                 'servicio_id' => 'required|exists:servicios,id',
             ]);
 
+            // Carga limpia del usuario
             $groomer = \App\Models\User::find($request->groomer_id);
             $fecha = $request->fecha;
 
             $horaInicioEnv = '09:00';
             $horaFinEnv = '18:00';
 
+            // Extracción ultra segura del turno soportando ambas estructuras de tablas
             $turnoRaw = $groomer->turno ?? 'completo';
             if (isset($groomer->groomer) && isset($groomer->groomer->turno)) {
                 $turnoRaw = $groomer->groomer->turno;
@@ -317,8 +314,10 @@ class CitaController extends Controller
             $servicio = \App\Models\Servicio::find($request->servicio_id);
             $mascota = \App\Models\Mascota::find($request->mascota_id);
             
+            // INTELIGENCIA COMPARTIDA: Lee 'duracion_base' o 'duracion_minutos' según tu migración
             $duracion = $servicio->duracion_base ?? $servicio->duracion_minutos ?? 45;
 
+            // Soporta tanto 'tamano' como 'tamaño' con la letra Ñ
             $tamanoMascota = $mascota->tamano ?? $mascota->tamaño ?? 'Pequeño'; 
 
             if ($tamanoMascota === 'Mediano') { $duracion += 10; }
@@ -359,6 +358,7 @@ class CitaController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            // Captura el fallo exacto de la base de datos y lo envía al navegador
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
