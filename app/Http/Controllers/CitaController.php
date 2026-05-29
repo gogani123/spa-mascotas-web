@@ -102,7 +102,7 @@ class CitaController extends Controller
             ->where('estado', '!=', 'Cancelada') 
             ->where(function ($query) use ($hora_inicio_str, $hora_fin_str) {
                 $query->where('hora_inicio', '<', $hora_fin_str)
-                      ->where('hora_fin', '>', $hora_inicio_str);
+                    ->where('hora_fin', '>', $hora_inicio_str);
             })
             ->first();
 
@@ -115,9 +115,9 @@ class CitaController extends Controller
         // ====================================================================
         // CORRECCIÓN DEFINITIVA: VALIDACIÓN DE SHIFT/TURNO INMUNE A CASING
         // ====================================================================
-        $groomerObj = \App\Models\User::with('groomer')->find($request->groomer_id);
-        $turnoRaw = $groomerObj->turno ?? ($groomerObj->groomer->turno ?? 'completo');
-        
+        $groomerObj = \App\Models\User::find($request->groomer_id);
+        $turnoRaw = $groomerObj->turno ?? 'completo';
+
         // Convertimos a minúsculas y limpiamos espacios para evitar fallas de tipeo
         $turnoNormalized = strtolower(trim($turnoRaw));
         $horaComparar = \Carbon\Carbon::parse($hora_inicio_str)->format('H:i');
@@ -364,21 +364,37 @@ class CitaController extends Controller
     }
 
     // ====================================================================
-    // NUEVO MÉTODO: CANCELAR CITA CON MOTIVO OBLIGATORIO (Punto 4.3)
+    // MÉTODO OPTIMIZADO: CANCELAR CITA CON POLÍTICA DE 24 HORAS (Punto 4.3)
     // ====================================================================
     public function cancelar(Request $request, $id)
     {
+        // 1. Validaciones estrictas: Motivo correcto y aceptación de términos obligatoria
         $request->validate([
             'motivo_cancelacion' => 'required|string|in:Salud,Tiempo,Emergencia,Otros',
+            'aceptar_politica'   => 'required|accepted',
+        ], [
+            'motivo_cancelacion.required' => '⚠️ Por favor, seleccione un motivo válido para la cancelación.',
+            'aceptar_politica.accepted'   => '⚠️ Debe aceptar los términos de la política de cancelación para continuar.',
         ]);
 
         $cita = \App\Models\Cita::findOrFail($id);
 
+        // 2. Unir fecha y hora para calcular la diferencia de tiempo con Carbon
+        $fechaCita = \Carbon\Carbon::parse($cita->fecha . ' ' . $cita->hora_inicio);
+
+        // 3. REGLA DE NEGOCIO: Si el usuario es Cliente (rol_id == 4), verificar las 24 horas mínimas
+        if (auth()->user()->rol_id == 4 && now()->diffInHours($fechaCita, false) < 24) {
+            return back()->withErrors([
+                'cancelacion_error' => '🛑 Operación rechazada: De acuerdo a nuestras políticas, los clientes solo pueden cancelar con un mínimo de 24 horas de anticipación.'
+            ]);
+        }
+
+        // 4. Cambiar estado y guardar el motivo (Esto libera automáticamente el slot en obtenerHorariosDisponibles)
         $cita->update([
             'estado' => 'Cancelada',
             'motivo_cancelacion' => $request->motivo_cancelacion
         ]);
 
-        return back()->with('success', '🚫 La cita ha sido cancelada y el espacio fue liberado en la agenda.');
+        return back()->with('success', '🚫 La cita ha sido cancelada con éxito y el espacio se encuentra libre en la agenda.');
     }
 }
