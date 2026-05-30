@@ -256,24 +256,30 @@ class GroomerController extends Controller
             return back()->withErrors(['error' => '❌ Restricción: No se puede cerrar la ficha sin completar el checklist técnico.']);
         }
 
-        // CORRECCIÓN: Ajustado al estado exacto del documento de base de datos
+        // =========================================================================
+        // ⚡ OPCON B: AUTOMATIZACIÓN DE FLUJO DE CUMPLIMIENTO Y CAJA ELECTRÓNICA
+        // =========================================================================
         $cita->estado = 'Completada'; 
+        $cita->estado_pago = 'Pagado'; // <-- ESTA ES LA LÍNEA MÁGICA QUE AGREGAMOS
         $cita->save();
 
-        // Descontar automáticamente insumos del inventario global
+        // Descontar automáticamente insumos del inventario global (Mantiene tu lógica intacta)
         $salidaInsumos = SalidaInsumo::where('cita_id', $citaId)->get();
         foreach ($salidaInsumos as $salida) {
             if ($salida->estado === 'usado' || $salida->estado === 'desperdiciado') {
                 $insumo = $salida->insumo;
-                $insumo->cantidad_disponible -= $salida->cantidad_usada;
-                $insumo->save();
+                if ($insumo) {
+                    $insumo->cantidad_disponible -= $salida->cantidad_usada;
+                    $insumo->save();
+                }
             }
         }
 
         // Disparar evento de notificación en tiempo real
         NotificacionService::notificarListoParaRecoger($cita);
 
-        return back()->with('success', '✨ ¡Servicio cerrado con éxito! El inventario fue actualizado y el cliente recibió la notificación de recojo.');
+        // Redirección directa hacia la ruta que querías
+        return redirect('/citas')->with('success', '✨ ¡Servicio finalizado con éxito! La mascota está lista para recojo y el pago fue registrado.');    
     }
 
     /**
@@ -292,4 +298,24 @@ class GroomerController extends Controller
             'recomendaciones_dadas' => false,
         ];
     }
+    public function registrarSalida(Request $request, $citaId)
+{
+    // Validamos datos básicos
+    $request->validate([
+        'insumo_id' => 'required|exists:insumos,id',
+        'cantidad_entregada' => 'required|integer|min:1',
+    ]);
+
+    // Creamos el registro de salida (Punto 7.1 del documento)
+    \App\Models\SalidaInsumo::create([
+        'cita_id' => $citaId,
+        'insumo_id' => $request->insumo_id,
+        'groomer_id' => auth()->id(), // Groomer responsable
+        'cantidad_entregada' => $request->cantidad_entregada,
+        'estado' => 'Entregado', // Estado inicial según documento
+        'fecha_salida' => now(),
+    ]);
+
+    return back()->with('success', 'Insumo registrado con éxito.');
+}
 }

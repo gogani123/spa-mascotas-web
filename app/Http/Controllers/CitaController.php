@@ -20,21 +20,20 @@ class CitaController extends Controller
         $usuario = Auth::user();
 
         if ($usuario->rol_id == 1 || $usuario->rol_id == 2) {
+            // Administradores ven TODO
             $citas = Cita::with(['cliente', 'mascota', 'servicio', 'groomer'])
-                        ->orderBy('fecha', 'desc')
-                        ->orderBy('hora_inicio', 'desc')
-                        ->get();
+                        ->orderBy('fecha', 'desc')->orderBy('hora_inicio', 'asc')->get();
         } elseif ($usuario->rol_id == 3) {
+            // Groomer solo ve SUS citas
             $citas = Cita::where('groomer_id', $usuario->id)
                         ->with(['cliente', 'mascota', 'servicio'])
-                        ->orderBy('fecha', 'asc')
-                        ->orderBy('hora_inicio', 'asc')
+                        ->orderBy('fecha', 'asc')->orderBy('hora_inicio', 'asc')
                         ->get();
         } else {
+            // Clientes solo ven SUS propias mascotas
             $citas = Cita::where('cliente_id', $usuario->id)
                         ->with(['mascota', 'servicio', 'groomer'])
-                        ->orderBy('fecha', 'asc')
-                        ->orderBy('hora_inicio', 'asc')
+                        ->orderBy('fecha', 'asc')->orderBy('hora_inicio', 'asc')
                         ->get();
         }
 
@@ -221,14 +220,57 @@ class CitaController extends Controller
         return redirect()->back()->with('success', '¡Cita de ' . $cita->mascota->nombre . ' aprobada correctamente!');
     }
 
+    // app/Http/Controllers/CitaController.php
+
     public function atender(Cita $cita)
     {
+        // 1. Seguridad: Verificar que el Groomer sea el dueño de la cita
         if (Auth::user()->rol_id == 3 && $cita->groomer_id != Auth::user()->id) {
             return redirect()->route('citas.index')->withErrors(['error' => 'No tienes permiso para atender esta cita.']);
         }
-        return view('citas.atender', compact('cita'));
-    }
 
+        // 2. NUEVO: Traer todos los insumos disponibles en el almacén global del Spa (Para el combo/select)
+        $insumosDisponibles = \App\Models\Insumo::orderBy('nombre', 'asc')->get();
+
+        // 3. NUEVO: Traer los insumos que YA han sido registrados o entregados para esta cita específica
+        $insumosEntregados = \App\Models\SalidaInsumo::where('cita_id', $cita->id)
+            ->with('insumo') // Cargamos la relación para leer el nombre del insumo
+            ->get();
+
+        // 4. Enviamos la cita, el catálogo de insumos y lo ya entregado directamente a la vista
+        return view('citas.atender', compact('cita', 'insumosDisponibles', 'insumosEntregados'));
+    }
+    // PEGA EL NUEVO MÉTODO JUSTO AQUÍ:
+    public function registrarSalida(Request $request, $citaId)
+    {
+        $request->validate([
+            'insumo_id' => 'required|exists:insumos,id',
+            'cantidad_entregada' => 'required|integer|min:1',
+        ]);
+
+        $salidaExistente = \App\Models\SalidaInsumo::where('cita_id', $citaId)
+            ->where('insumo_id', $request->insumo_id)
+            ->where('estado', 'Entregado')
+            ->first();
+
+        if ($salidaExistente) {
+            $salidaExistente->cantidad_entregada += $request->cantidad_entregada;
+            $salidaExistente->save();
+        } else {
+            \App\Models\SalidaInsumo::create([
+                'cita_id' => $citaId,
+                'insumo_id' => $request->insumo_id,
+                'groomer_id' => Auth::id(),
+                'cantidad_entregada' => $request->cantidad_entregada,
+                'cantidad_usada' => 0,
+                'cantidad_devuelta' => 0,
+                'estado' => 'Entregado',
+                'fecha_salida' => now(),
+            ]);
+        }
+
+        return back()->with('success', '📦 Material registrado y asignado al flujo del servicio correctamente.');
+    }
     public function completar(Request $request, $id)
     {
         $cita = \App\Models\Cita::findOrFail($id);
@@ -397,4 +439,49 @@ class CitaController extends Controller
 
         return back()->with('success', '🚫 La cita ha sido cancelada con éxito y el espacio se encuentra libre en la agenda.');
     }
+    // ====================================================================
+    // EMISIÓN DE RECIBO DIGITAL DE PAGO (Punto 5.2)
+    // ====================================================================
+    public function generarRecibo($id)
+    {
+        $cita = Cita::with(['cliente', 'mascota', 'servicio', 'groomer'])->findOrFail($id);
+        
+        if ($cita->estado_pago !== 'Pagado') {
+            return redirect()->route('citas.index')->withErrors(['error' => 'No se puede emitir un recibo de una cita que no ha sido pagada.']);
+        }
+
+        return view('citas.recibo', compact('cita'));
+    }
+
+    // ====================================================================
+    // CONSOLIDACIÓN DIARIA / CIERRE DE CAJA (Punto 5.2 - SOLUCIÓN POSTGRES)
+    // ====================================================================
+    public function cierreCaja()
+    {
+        $hoy = \Carbon\Carbon::now('America/La_Paz')->format('Y-m-d');
+
+        $citasDelDia = Cita::where('estado_pago', 'Pagado')
+            ->whereDate('fecha', $hoy)
+            ->with('servicio')
+            ->get();
+
+        $totalCitas = $citasDelDia->sum(function($cita) {
+            return $cita->servicio->precio ?? 0;
+        });
+
+        // CORRECCIÓN: Usamos map para devolver objetos y que la vista no falle
+        $consolidadoMetodos = $citasDelDia->groupBy('metodo_pago')
+            ->map(function ($grupo, $metodo) {
+                return (object) [
+                    'metodo_pago' => $metodo,
+                    'total_metodo' => $grupo->sum(function($cita) { return $cita->servicio->precio ?? 0; }),
+                    'cantidad' => $grupo->count()
+                ];
+            });
+
+        $totalTransacciones = $citasDelDia->count();
+
+        return view('admin.cierre_caja', compact('totalCitas', 'consolidadoMetodos', 'totalTransacciones', 'hoy'));
+    }
+    
 }

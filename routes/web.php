@@ -40,6 +40,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/citas', [App\Http\Controllers\CitaController::class, 'index'])->name('citas.index');
     Route::get('/citas/crear', [App\Http\Controllers\CitaController::class, 'create'])->name('citas.create');
     Route::post('/citas', [App\Http\Controllers\CitaController::class, 'store'])->name('citas.store');
+    // Nuevas rutas de soporte para el Módulo 5.2
+    Route::get('/citas/{cita}/recibo', [App\Http\Controllers\CitaController::class, 'generarRecibo'])->name('citas.recibo');
+    Route::get('/admin/cierre-caja', [App\Http\Controllers\CitaController::class, 'cierreCaja'])->name('admin.cierre_caja')->middleware(CheckRole::class . ':1,2');
     // ---------------------------------
     
     Route::get('/citas/{cita}/cobrar', [App\Http\Controllers\CitaController::class, 'cobrar'])->name('citas.cobrar');
@@ -141,4 +144,9 @@ Route::middleware(['auth', 'verified', CheckRole::class . ':3'])->prefix('groome
     Route::post('insumos/{cita}/usar', [GroomerController::class, 'registrarUsoInsumos'])->name('insumos.usar');
 });
 
+// Al final de todo en routes/web.php, agrega esto:
+
+Route::post('/groomer/insumos/{citaId}/registrar', [CitaController::class, 'registrarSalida'])
+    ->name('groomer.insumos.registrar')
+    ->middleware('auth');
 require __DIR__.'/auth.php';
