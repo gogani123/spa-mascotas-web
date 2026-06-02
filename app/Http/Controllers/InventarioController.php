@@ -69,7 +69,7 @@ class InventarioController extends Controller
             'datos_nuevos' => json_encode($validated),
         ]);
 
-        return redirect()->route('inventario.index')->with('success', "✅ Insumo '{$insumo->nombre}' creado correctamente");
+        return redirect()->route('admin.inventario.index')->with('success', "✅ Insumo '{$insumo->nombre}' creado correctamente");
     }
 
     /**
@@ -117,7 +117,7 @@ class InventarioController extends Controller
             'datos_nuevos' => json_encode($validated),
         ]);
 
-        return redirect()->route('inventario.index')->with('success', "✅ Insumo '{$insumo->nombre}' actualizado correctamente");
+        return redirect()->route('admin.inventario.index')->with('success', "✅ Insumo '{$insumo->nombre}' actualizado correctamente");
     }
 
     /**
@@ -143,7 +143,7 @@ class InventarioController extends Controller
 
         $insumo->delete();
 
-        return redirect()->route('inventario.index')->with('success', "✅ Insumo '{$nombre}' eliminado correctamente");
+        return redirect()->route('admin.inventario.index')->with('success', "✅ Insumo '{$nombre}' eliminado correctamente");
     }
 
     /**

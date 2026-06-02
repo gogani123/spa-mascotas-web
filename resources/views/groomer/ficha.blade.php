@@ -35,29 +35,33 @@
             </div>
         @endif
 
+        <!-- MENÚ DE PESTAÑAS (Modificado para incluir Insumos) -->
         <div class="bg-gray-800 rounded-lg shadow-md mb-6 border-b border-gray-700">
             <div class="flex overflow-x-auto">
-                <button onclick="activeTab('estado')" class="tab-button px-6 py-4 font-semibold text-indigo-400 border-b-2 border-indigo-500 transition">
+                <button onclick="activeTab('estado')" class="tab-button px-6 py-4 font-semibold text-indigo-400 border-b-2 border-indigo-500 transition whitespace-nowrap">
                     📋 Ficha de Ingreso
                 </button>
-                <button onclick="activeTab('checklist')" class="tab-button px-6 py-4 font-semibold text-gray-400 border-b-2 border-transparent hover:text-indigo-400 transition">
+                <button onclick="activeTab('checklist')" class="tab-button px-6 py-4 font-semibold text-gray-400 border-b-2 border-transparent hover:text-indigo-400 transition whitespace-nowrap">
                     ✅ Checklist Técnico
                 </button>
-                <button onclick="activeTab('fotos')" class="tab-button px-6 py-4 font-semibold text-gray-400 border-b-2 border-transparent hover:text-indigo-400 transition">
+                <button onclick="activeTab('insumos')" class="tab-button px-6 py-4 font-semibold text-gray-400 border-b-2 border-transparent hover:text-indigo-400 transition whitespace-nowrap">
+                    📦 Materiales e Insumos
+                </button>
+                <button onclick="activeTab('fotos')" class="tab-button px-6 py-4 font-semibold text-gray-400 border-b-2 border-transparent hover:text-indigo-400 transition whitespace-nowrap">
                     📷 Evidencia Fotos
                 </button>
-                <button onclick="activeTab('recomendaciones')" class="tab-button px-6 py-4 font-semibold text-gray-400 border-b-2 border-transparent hover:text-indigo-400 transition">
+                <button onclick="activeTab('recomendaciones')" class="tab-button px-6 py-4 font-semibold text-gray-400 border-b-2 border-transparent hover:text-indigo-400 transition whitespace-nowrap">
                     💡 Recomendaciones y Cierre
                 </button>
             </div>
         </div>
 
+        <!-- TAB 1: FICHA DE INGRESO -->
         <div id="estado" class="tab-content bg-gray-800 rounded-lg shadow-md p-6 mb-6 text-gray-200">
             <h2 class="text-xl font-bold text-indigo-400 mb-4">📋 Registro de Condición Física</h2>
             
             <form action="{{ route('groomer.ficha.guardar', $cita->id) }}" method="POST" class="space-y-6">
                 @csrf
-
                 <div>
                     <label for="estado_ingreso" class="block text-sm font-semibold text-gray-300 mb-2">
                         🔍 Estado de Ingreso (Nudos, parásitos, heridas en la piel) *
@@ -97,6 +101,7 @@
             </form>
         </div>
 
+        <!-- TAB 2: CHECKLIST -->
         <div id="checklist" class="tab-content bg-gray-800 rounded-lg shadow-md p-6 mb-6 hidden text-gray-200">
             <h2 class="text-xl font-bold text-emerald-400 mb-2">✅ Checklist de Tareas Operativas</h2>
             <p class="text-xs text-gray-400 mb-6">Marca los procesos completados en la mesa de peluquería. (Requerido: Mínimo 3 tareas).</p>
@@ -126,6 +131,70 @@
             </form>
         </div>
 
+        <!-- NUEVA TAB 3: GESTIÓN DE INSUMOS (Punto 7.1 Requerimiento) -->
+        <div id="insumos" class="tab-content bg-gray-800 rounded-lg shadow-md p-6 mb-6 hidden text-gray-200">
+            <h2 class="text-xl font-bold text-amber-400 mb-2">📦 Gestión de Materiales e Insumos</h2>
+            <p class="text-xs text-gray-400 mb-6">Reporta los mililitros o unidades que utilizaste o devolviste al almacén para este servicio.</p>
+
+            @if(!$cita->salidaInsumos || $cita->salidaInsumos->count() == 0)
+                <div class="bg-gray-900/50 p-6 rounded-lg text-center border border-dashed border-gray-700">
+                    <p class="text-gray-400 text-sm">🔒 No tienes materiales asignados por Recepción aún para esta cita.</p>
+                </div>
+            @else
+                <div class="space-y-4">
+                    @foreach($cita->salidaInsumos as $salida)
+                        <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                                <h3 class="text-base font-bold text-white">{{ $salida->insumo->nombre }}</h3>
+                                <p class="text-xs text-gray-400 mt-0.5">
+                                    Entregado por recepción: <span class="text-indigo-400 font-bold">{{ $salida->cantidad_entregada }} {{ $salida->insumo->unidad }}</span>[cite: 2]
+                                </p>
+                            </div>
+
+                            <div>
+                                @if($salida->estado == 'Entregado')
+                                    <!-- Formulario para que el Groomer edite su consumo -->
+                                    <form action="{{ route('salidas.actualizarUso', $salida->id) }}" method="POST" class="flex flex-wrap items-center gap-3">
+                                        @csrf
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-gray-400 uppercase">Cantidad Usada[cite: 2]</label>
+                                            <input type="number" name="cantidad_usada" min="0" max="{{ $salida->cantidad_entregada }}" required
+                                                   class="w-20 bg-gray-800 border-gray-700 text-white text-xs rounded p-1.5 focus:ring-1 focus:ring-indigo-500">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-gray-400 uppercase">Devuelta[cite: 2]</label>
+                                            <input type="number" name="cantidad_devuelta" min="0" max="{{ $salida->cantidad_entregada }}" required
+                                                   class="w-20 bg-gray-800 border-gray-700 text-white text-xs rounded p-1.5 focus:ring-1 focus:ring-indigo-500">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-gray-400 uppercase">Estado final[cite: 2]</label>
+                                            <select name="estado" required class="w-28 bg-gray-800 border-gray-700 text-white text-xs rounded p-1.5 focus:ring-1 focus:ring-indigo-500">
+                                                <option value="Usado">Usado / Normal[cite: 2]</option>
+                                                <option value="Completado">Completado[cite: 2]</option>
+                                                <option value="Desperdiciado">Desperdiciado / Merma[cite: 2]</option>
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-1.5 px-3 rounded shadow transition mt-4">
+                                            Confirmar
+                                        </button>
+                                    </form>
+                                @else
+                                    <!-- Si ya lo reportó, solo muestra el resultado congelado -->
+                                    <div class="text-right text-xs">
+                                        <span class="px-2 py-0.5 rounded-full font-bold uppercase text-[10px] bg-green-950 text-green-400 border border-green-800">
+                                            📊 Reportado ({{ $salida->estado }})[cite: 2]
+                                        </span>
+                                        <p class="text-gray-400 mt-1">Usó: {{ $salida->cantidad_usada }} | Devolvió: {{ $salida->cantidad_devuelta }}</p>[cite: 2]
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
+        <!-- TAB 4: FOTOS -->
         <div id="fotos" class="tab-content bg-gray-800 rounded-lg shadow-md p-6 mb-6 hidden text-gray-200">
             <h2 class="text-xl font-bold text-indigo-400 mb-4">📷 Galería de Evidencia Visual</h2>
             
@@ -175,6 +244,7 @@
             @endif
         </div>
 
+        <!-- TAB 5: RECOMENDACIONES Y CIERRE -->
         <div id="recomendaciones" class="tab-content bg-gray-800 rounded-lg shadow-md p-6 mb-6 hidden text-gray-200">
             <h2 class="text-xl font-bold text-indigo-400 mb-4">💡 Indicaciones de Entrega</h2>
             
@@ -205,6 +275,7 @@
         </div>
     </div>
 
+    <!-- SCRIPT DE NAVEGACIÓN ENTRE TABS (Ajustado) -->
     <script>
     function activeTab(tabName) {
         // Ocultar todos los contenidos de las pestañas

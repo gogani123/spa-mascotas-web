@@ -1,5 +1,5 @@
 <?php
-
+use App\Http\Controllers\SalidaInsumoController;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use App\Http\Controllers\CitaController;
@@ -17,6 +17,35 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TiendaController;
 use App\Http\Controllers\GroomerController;
 use App\Http\Controllers\InventarioController;
+
+
+Route::middleware(['auth'])->group(function () {
+    
+    // Grupo de rutas para el Inventario con prefijo 'admin' y nombre 'admin.inventario.*'
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/inventario', [InventarioController::class, 'index'])->name('inventario.index');
+        Route::get('/inventario/crear', [InventarioController::class, 'create'])->name('inventario.create');
+        Route::post('/inventario/guardar', [InventarioController::class, 'store'])->name('inventario.store');
+        Route::get('/inventario/{insumo}/editar', [InventarioController::class, 'edit'])->name('inventario.edit');
+        Route::put('/inventario/{insumo}/actualizar', [InventarioController::class, 'update'])->name('inventario.update');
+        Route::delete('/inventario/{insumo}/eliminar', [InventarioController::class, 'destroy'])->name('inventario.destroy');
+        Route::get('/inventario/alertas', [InventarioController::class, 'alertas'])->name('inventario.alertas');
+        Route::post('/inventario/{insumo}/entrada', [InventarioController::class, 'registrarEntrada'])->name('inventario.registrarEntrada');
+    });
+
+    // Rutas de flujo operativo de Insumos (Groomer / Recepción)
+    Route::post('/salidas-insumos/entregar', [SalidaInsumoController::class, 'entregar'])->name('salidas.entregar');
+    Route::post('/salidas-insumos/{salida}/actualizar-uso', [SalidaInsumoController::class, 'actualizarUso'])->name('salidas.actualizarUso');
+});
+Route::middleware(['auth'])->group(function () {
+    // Rutas para Recepción y Administrador (Registrar entregas de insumos)
+    Route::post('/salidas-insumos/entregar', [SalidaInsumoController::class, 'entregar'])
+        ->name('salidas.entregar');
+
+    // Rutas para el Groomer (Registrar uso y devolución al cerrar el servicio)
+    Route::post('/salidas-insumos/{salida}/actualizar-uso', [SalidaInsumoController::class, 'actualizarUso'])
+        ->name('salidas.actualizarUso');
+});
 
 Route::get('/', function () {
     return view('welcome');
