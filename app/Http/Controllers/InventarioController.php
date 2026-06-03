@@ -151,17 +151,28 @@ class InventarioController extends Controller
      */
     public function alertas()
     {
-        if (Auth::user()->rol_id != 1) {
+        // 1. Seguridad: Validar que sea Admin (1) o Recepción (2) según tus rutas compartidas
+        if (auth()->user()->rol_id != 1 && auth()->user()->rol_id != 2) {
             return redirect()->route('dashboard')->withErrors(['error' => 'Acceso denegado']);
         }
 
+        // 2. Tu consulta original de Bajo Stock (Insumos y productos que perforaron el mínimo)
         $insumosBajoStock = Insumo::where('cantidad_disponible', '<=', \DB::raw('cantidad_minima'))
-            ->orderBy('cantidad_disponible')
+            ->orderBy('cantidad_disponible', 'asc')
             ->paginate(20);
 
         $cantidadAlertas = $insumosBajoStock->total();
 
-        return view('inventario.alertas', compact('insumosBajoStock', 'cantidadAlertas'));
+        // 3. NUEVO (Módulo 7.3 - Alto Consumo): Detectar si algún groomer usó más de lo normal en los últimos 7 días
+        // Consideramos "Alto Consumo" si una salida individual supera las 15 unidades/mililitros
+        $alertasAltoConsumo = \App\Models\SalidaInsumo::with(['insumo', 'groomer', 'cita.servicio'])
+            ->where('cantidad_usada', '>=', 15)
+            ->where('created_at', '>=', now()->subDays(7))
+            ->orderBy('cantidad_usada', 'desc')
+            ->get();
+
+        // Enviamos todo compactado respetando tus variables originales
+        return view('inventario.alertas', compact('insumosBajoStock', 'cantidadAlertas', 'alertasAltoConsumo'));
     }
 
     /**

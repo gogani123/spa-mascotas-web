@@ -11,6 +11,10 @@ use App\Services\NotificacionService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Insumo;
+use App\Models\SalidaInsumo;
+use App\Models\AuditLog;
+use Illuminate\Support\Facades\DB;
 
 class CitaController extends Controller
 {
@@ -248,29 +252,57 @@ class CitaController extends Controller
             'cantidad_entregada' => 'required|integer|min:1',
         ]);
 
-        $salidaExistente = \App\Models\SalidaInsumo::where('cita_id', $citaId)
-            ->where('insumo_id', $request->insumo_id)
-            ->where('estado', 'Entregado')
-            ->first();
+        $cita = \App\Models\Cita::findOrFail($citaId);
+        $insumo = \App\Models\Insumo::findOrFail($request->insumo_id);
 
-        if ($salidaExistente) {
-            $salidaExistente->cantidad_entregada += $request->cantidad_entregada;
-            $salidaExistente->save();
-        } else {
-            \App\Models\SalidaInsumo::create([
-                'cita_id' => $citaId,
-                'insumo_id' => $request->insumo_id,
-                'groomer_id' => Auth::id(),
-                'cantidad_entregada' => $request->cantidad_entregada,
-                'cantidad_usada' => 0,
-                'cantidad_devuelta' => 0,
-                'estado' => 'Entregado',
-                'fecha_salida' => now(),
-            ]);
+        // 1. Validar disponibilidad de stock real antes de prestar el suministro
+        if ($insumo->cantidad_disponible < $request->cantidad_entregada) {
+            return response()->json(['error' => 'Stock insuficiente en el almacén central.'], 422);
         }
 
-        return back()->with('success', '📦 Material registrado y asignado al flujo del servicio correctamente.');
+        // 2. Transacción de Base de Datos para garantizar consistencia absoluta
+        DB::transaction(function () use ($request, $cita, $insumo) {
+            // Restar existencias del almacén global de inmediato
+            $insumo->decrement('cantidad_disponible', $request->cantidad_entregada);
+
+            // Verificar si ya se le había entregado este mismo insumo en la misma sesión
+            $salidaExistente = \App\Models\SalidaInsumo::where('cita_id', $cita->id)
+                ->where('insumo_id', $request->insumo_id)
+                ->where('estado', 'Entregado')
+                ->first();
+
+            if ($salidaExistente) {
+                $salidaExistente->cantidad_entregada += $request->cantidad_entregada;
+                $salidaExistente->save();
+                $salida = $salidaExistente;
+            } else {
+                $salida = \App\Models\SalidaInsumo::create([
+                    'cita_id' => $cita->id,
+                    'insumo_id' => $request->insumo_id,
+                    'groomer_id' => $cita->groomer_id ?? Auth::id(),
+                    'cantidad_entregada' => $request->cantidad_entregada,
+                    'cantidad_usada' => 0,
+                    'cantidad_devuelta' => 0,
+                    'estado' => 'Entregado',
+                    'fecha_salida' => now('America/La_Paz'),
+                ]);
+            }
+
+            // Registrar la operación en la auditoría del Spa
+            \App\Models\AuditLog::create([
+                'usuario_id' => Auth::user()->id,
+                'accion' => 'despachar_insumo_servicio',
+                'modelo' => 'SalidaInsumo',
+                'modelo_id' => $salida->id,
+                'datos_antiguos' => null,
+                'datos_nuevos' => json_encode($salida),
+            ]);
+        });
+
+        // Respondemos con éxito en JSON para que el script 'fetch' de tu vista recargue la página suavemente
+        return response()->json(['success' => true]);
     }
+
     public function completar(Request $request, $id)
     {
         $cita = \App\Models\Cita::findOrFail($id);
@@ -281,6 +313,7 @@ class CitaController extends Controller
             'foto_despues'   => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
+        // 1. Procesamiento de archivos de evidencia visual (Punto 6)
         $rutaAntes = null;
         if ($request->hasFile('foto_antes')) {
             $rutaAntes = $request->file('foto_antes')->store('grooming', 'public');
@@ -291,13 +324,60 @@ class CitaController extends Controller
             $rutaDespues = $request->file('foto_despues')->store('grooming', 'public');
         }
 
+        // ====================================================================
+        // INTERSECCIÓN 7.2: DESCUENTO Y LOGICA DE INSUMOS AUTOMÁTICA
+        // ====================================================================
+        if ($request->has('insumo_estado')) {
+            DB::transaction(function () use ($request) {
+                foreach ($request->insumo_estado as $salidaId => $estadoFinal) {
+                    // Buscamos el registro de entrega de material asociado
+                    $salida = \App\Models\SalidaInsumo::with('insumo')->find($salidaId);
+                    
+                    if ($salida && $salida->estado == 'Entregado') {
+                        $cantidadUsada = 0;
+                        $cantidadDevuelta = 0;
+
+                        if ($estadoFinal === 'Usado') {
+                            $cantidadUsada = $salida->cantidad_entregada;
+                        } elseif ($estadoFinal === 'Desperdiciado') {
+                            $cantidadUsada = $salida->cantidad_entregada; // Cuenta como merma consumida para control de costos
+                        } elseif ($estadoFinal === 'Devuelto') {
+                            $cantidadDevuelta = $salida->cantidad_entregada;
+                            
+                            // FUNCIONALIDAD DE DEVOLUCIÓN: Reincorporación inmediata al stock global del Spa
+                            $salida->insumo->increment('cantidad_disponible', $cantidadDevuelta);
+                        }
+
+                        // Actualización del registro puente consolidando las cantidades definitivas
+                        $salida->update([
+                            'cantidad_usada' => $cantidadUsada,
+                            'cantidad_devuelta' => $cantidadDevuelta,
+                            'estado' => $estadoFinal,
+                            'observaciones' => 'Consumo final cerrado automáticamente en el cierre definitivo del servicio.',
+                        ]);
+
+                        // Registro riguroso en Auditoría de Sistema (Logs)
+                        \App\Models\AuditLog::create([
+                            'usuario_id' => Auth::user()->id,
+                            'accion' => 'cierre_inventario_servicio',
+                            'modelo' => 'SalidaInsumo',
+                            'modelo_id' => $salida->id,
+                            'datos_antiguos' => json_encode(['estado' => 'Entregado']),
+                            'datos_nuevos' => json_encode([
+                                'estado' => $estadoFinal,
+                                'usado' => $cantidadUsada,
+                                'devuelto' => $cantidadDevuelta
+                            ]),
+                        ]);
+                    }
+                }
+            });
+        }
+        // ====================================================================
+
+        // 2. Guardar el Historial Clínico en la Ficha Técnica de Grooming
         $datosJson = [
-            'tareas'  => $request->checklist ?? [],
-            'insumos' => [
-                'shampoo' => $request->insumo_shampoo,
-                'perfume' => $request->insumo_perfume,
-                'algodon' => $request->insumo_algodon,
-            ]
+            'tareas' => $request->checklist ?? [],
         ];
 
         \App\Models\FichaGrooming::updateOrCreate(
@@ -310,9 +390,10 @@ class CitaController extends Controller
             ]
         );
 
+        // 3. Actualizamos el estado de la cita a Completada
         $cita->update(['estado' => 'Completada']);
 
-        return redirect()->route('citas.index')->with('success', '¡Servicio cerrado exitosamente! La ficha técnica y las fotos han sido guardadas.');
+        return redirect()->route('citas.index')->with('success', '🏁 ¡Servicio cerrado con éxito! La ficha técnica ha sido guardada y los niveles de inventario se actualizaron correctamente.');
     }
 
     // ====================================================================

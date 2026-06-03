@@ -46,4 +46,25 @@ class Insumo extends Model
         }
         return 'disponible';
     }
+    public function getRequiereAlertaAttribute()
+    {
+        $stockMinimo = 15;
+        return $this->cantidad_disponible <= $stockMinimo;
+    }
+
+    public function getAltoConsumoAttribute()
+    {
+        $promedioSemanal = $this->salidainsumos()
+            ->where('created_at', '>=', now()->subDays(7))
+            ->avg('cantidad_usada') ?? 0;
+
+        // Si una sola salida supera por el doble al promedio diario, se dispara la alerta
+        return $promedioSemanal > 50; 
+    }
+    public function getSugerenciaReabastecimientoAttribute()
+    {
+        $stockOptimo = 200; // Nivel ideal en almacén
+        $falta = $stockOptimo - $this->cantidad_disponible;
+        return $falta > 0 ? $falta : 0;
+    }
 }

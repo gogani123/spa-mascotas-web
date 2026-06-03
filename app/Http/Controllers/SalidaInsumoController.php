@@ -78,10 +78,11 @@ class SalidaInsumoController extends Controller
             return back()->withErrors(['error' => 'No estás autorizado para modificar los consumos de este servicio.']);
         }
 
+        // CORREGIDO: Flexibilizamos la validación y permitimos observaciones nulas
         $validated = $request->validate([
             'cantidad_usada'    => 'required|integer|min:0',
             'cantidad_devuelta' => 'required|integer|min:0',
-            'estado'            => 'required|in:Usado,Devuelto,Desperdiciado,Completado',
+            'estado'            => 'required|string', 
             'observaciones'     => 'nullable|string|max:500',
         ]);
 
@@ -96,16 +97,16 @@ class SalidaInsumoController extends Controller
             $datosAntiguos = $salida->toArray();
 
             // Si el groomer devuelve insumos limpios/reutilizables, los regresamos al stock global
-            if ($validated['cantidad_devuelta'] > 0) {
-                $insumo->increment('cantidad_disponible', $validated['cantidad_devuelta']);
+            if (intval($validated['cantidad_devuelta']) > 0) {
+                $insumo->increment('cantidad_disponible', intval($validated['cantidad_devuelta']));
             }
 
-            // Actualizar la salida
+            // Actualizar la salida de forma segura
             $salida->update([
                 'cantidad_usada'    => $validated['cantidad_usada'],
                 'cantidad_devuelta' => $validated['cantidad_devuelta'],
                 'estado'            => $validated['estado'],
-                'observaciones'     => $validated['observaciones'],
+                'observaciones'     => $validated['observaciones'] ?? 'Uso e inventario procesado por el Groomer.',
             ]);
 
             // Auditoría
@@ -119,6 +120,6 @@ class SalidaInsumoController extends Controller
             ]);
         });
 
-        return back()->with('success', '✅ Consumo de insumos actualizado correctamente.');
+        return back()->with('success', '📦 ¡Consumo de insumos actualizado e inventario sincronizado con éxito!');
     }
 }

@@ -37,7 +37,7 @@
                             <th class="p-4 text-center">Mínimo Permitido</th>
                             <th class="p-4 text-center">Estado</th>
                             <th class="p-4 text-center">Precio Unit.</th>
-                            <th class="p-4 text-center">Acciones</th>
+                            <th class="p-4 text-center">Acciones y Despacho Operativo</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-700 bg-gray-900/40">
@@ -74,19 +74,43 @@
                                     Bs. {{ number_format($insumo->precio_unitario, 2) }}
                                 </td>
                                 <td class="p-4 text-center">
-                                    <div class="flex items-center justify-center gap-3">
-                                        <a href="{{ route('admin.inventario.edit', $insumo) }}" class="text-blue-400 hover:text-blue-300 font-semibold transition text-xs">
-                                            Editar
-                                        </a>
-                                        <form method="POST" action="{{ route('admin.inventario.destroy', $insumo) }}" class="inline">
+                                    <div class="flex flex-col gap-2 justify-center items-center">
+                                        
+                                        <form method="POST" action="#" class="flex items-center gap-1 async-despacho-form">
                                             @csrf
+                                            <input type="hidden" name="insumo_id" value="{{ $insumo->id }}">
                                             
-                                            @method('DELETE')
-                                            <button type="submit" class="text-red-400 hover:text-red-300 font-semibold transition text-xs" 
-                                                    onclick="return confirm('¿Estás completamente seguro de que deseas eliminar este insumo del almacén?')">
-                                                Eliminar
+                                            <select name="cita_id" required class="bg-gray-900 border-gray-700 text-white text-[11px] rounded p-1 w-32 focus:ring-1 focus:ring-indigo-500">
+                                                <option value="">-- Asignar a Cita --</option>
+                                                @foreach(\App\Models\Cita::whereIn('estado', ['Confirmada', 'En Progreso'])->get() as $c)
+                                                    <option value="{{ $c->id }}">
+                                                        {{ $c->mascota->nombre }} (ID: {{ $c->id }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+
+                                            <input type="number" name="cantidad_entregada" min="1" required placeholder="Cant." 
+                                                   class="w-14 bg-gray-900 border-gray-700 text-white text-[11px] rounded p-1 font-mono">
+
+                                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-2 py-1 rounded text-[10px] uppercase tracking-wider transition shadow">
+                                                🚀 Dar
                                             </button>
                                         </form>
+
+                                        <div class="flex items-center gap-3 mt-1 border-t border-gray-700/50 pt-1 w-full justify-center">
+                                            <a href="{{ route('admin.inventario.edit', $insumo) }}" class="text-blue-400 hover:text-blue-300 font-semibold transition text-xs">
+                                                Editar
+                                            </a>
+                                            <form method="POST" action="{{ route('admin.inventario.destroy', $insumo) }}" class="inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="text-red-400 hover:text-red-300 font-semibold transition text-xs" 
+                                                        onclick="return confirm('¿Estás completamente seguro de que deseas eliminar este insumo del almacén?')">
+                                                    Eliminar
+                                                </button>
+                                            </form>
+                                        </div>
+
                                     </div>
                                 </td>
                             </tr>
@@ -106,4 +130,39 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.querySelectorAll('.async-despacho-form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const citaId = this.querySelector('select[name="cita_id"]').value;
+                if (!citaId) {
+                    alert('⚠️ Por favor, selecciona una cita de la lista para despachar el material.');
+                    return;
+                }
+
+                // Generamos la URL dinámica en base a tu ruta registrada en web.php
+                const url = "{{ url('/groomer/insumos') }}/" + citaId + "/registrar";
+                const formData = new FormData(this);
+
+                fetch(url, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => {
+                    if (res.ok) {
+                        alert('📦 ¡Insumo asignado con éxito! El stock ha sido rebajado y el Groomer lo verá reflejado al atender.');
+                        window.location.reload();
+                    } else {
+                        alert('❌ Error: El almacén central no cuenta con stock suficiente de este suministro.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('🚨 Ocurrió un error de red al procesar el despacho.');
+                });
+            });
+        });
+    </script>
 </x-app-layout>
