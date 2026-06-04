@@ -42,6 +42,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/citas', [CitaController::class, 'store'])->name('citas.store');
     Route::get('/citas/{cita}/recibo', [CitaController::class, 'generarRecibo'])->name('citas.recibo');
     Route::get('/admin/cierre-caja', [CitaController::class, 'cierreCaja'])->name('admin.cierre_caja')->middleware(CheckRole::class . ':1,2');
+    // Rutas para que el Admin gestione los productos de la tienda
+    Route::get('/admin/productos/crear', [TiendaController::class, 'crear'])->name('admin.productos.crear');
+    Route::post('/admin/productos/guardar', [TiendaController::class, 'guardar'])->name('admin.productos.guardar');
     Route::get('/citas/{cita}/cobrar', [CitaController::class, 'cobrar'])->name('citas.cobrar');
     Route::post('/citas/{cita}/aprobar', [CitaController::class, 'aprobar'])->name('citas.aprobar');
     Route::post('/citas/{cita}/pagar', [CitaController::class, 'pagar'])->name('citas.pagar');
