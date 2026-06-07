@@ -135,7 +135,7 @@ class GroomerController extends Controller
         // CORRECCIÓN DEL BUG: Contamos cuántas casillas fueron enviadas como marcadas
         $completados = count($checklist);
         
-        if ($completados < 3) {
+        if ($completados < 5) {
             return back()->withErrors(['error' => '❌ Módulo Grooming: Debes marcar al menos 3 ítems del checklist para registrar el avance técnico.']);
         }
 
@@ -238,7 +238,7 @@ class GroomerController extends Controller
     }
 
     /**
-     * Cerrar servicio (CORREGIDO CON ESTADO 'Completada')
+     * Cerrar servicio (CON VERIFICACIÓN AUTOMÁTICA DE BAJO STOCK - PUNTO 9)
      */
     public function cerrarServicio(Request $request, $citaId)
     {
@@ -257,29 +257,41 @@ class GroomerController extends Controller
         }
 
         // =========================================================================
-        // ⚡ OPCON B: AUTOMATIZACIÓN DE FLUJO DE CUMPLIMIENTO Y CAJA ELECTRÓNICA
+        // AUTOMATIZACIÓN DE FLUJO DE CUMPLIMIENTO Y CAJA ELECTRÓNICA
         // =========================================================================
         $cita->estado = 'Completada'; 
-        $cita->estado_pago = 'Pagado'; // <-- ESTA ES LA LÍNEA MÁGICA QUE AGREGAMOS
+        $cita->estado_pago = 'Pagado'; 
         $cita->save();
 
-        // Descontar automáticamente insumos del inventario global (Mantiene tu lógica intacta)
+        // 1. Descontar automáticamente insumos del inventario global
         $salidaInsumos = SalidaInsumo::where('cita_id', $citaId)->get();
+        
+        // Capturar de forma preventiva a los usuarios que deben recibir alertas de almacén
+        $usuariosAlerta = \App\Models\User::whereIn('rol_id', [1, 2])->get();
+
         foreach ($salidaInsumos as $salida) {
             if ($salida->estado === 'usado' || $salida->estado === 'desperdiciado') {
                 $insumo = $salida->insumo;
                 if ($insumo) {
                     $insumo->cantidad_disponible -= $salida->cantidad_usada;
                     $insumo->save();
+
+                    // ====================================================================
+                    // ⚡ NUEVO DISPARADOR AUTOMÁTICO: DETECTOR DE BAJO STOCK (PUNTO 9)
+                    // ====================================================================
+                    // Si tras el consumo en cabina el stock iguala o cae por debajo del mínimo, gatillar la alerta
+                    if ($insumo->cantidad_disponible <= $insumo->cantidad_minima) {
+                        \App\Services\NotificacionService::notificarBajoStock($insumo, $usuariosAlerta);
+                    }
+                    // ====================================================================
                 }
             }
         }
 
-        // Disparar evento de notificación en tiempo real
+        // 2. Disparar evento de notificación de recojo al cliente en tiempo real
         NotificacionService::notificarListoParaRecoger($cita);
 
-        // Redirección directa hacia la ruta que querías
-        return redirect('/citas')->with('success', '✨ ¡Servicio finalizado con éxito! La mascota está lista para recojo y el pago fue registrado.');    
+        return redirect('/citas')->with('success', '✨ ¡Servicio finalizado con éxito! La mascota está lista para recojo, el inventario fue actualizado y se evaluaron las alertas de stock.');    
     }
 
     /**

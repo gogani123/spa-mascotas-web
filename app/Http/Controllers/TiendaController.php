@@ -86,14 +86,36 @@ class TiendaController extends Controller
 
     public function aplicarCupon(Request $request)
     {
-        $cupon = DB::table('cupones')->where('codigo', strtoupper($request->codigo))->where('activo', true)->first();
+        $request->validate([
+            'codigo' => 'required|string',
+        ]);
+
+        $codigoIngresado = strtoupper(trim($request->codigo));
+        $hoy = now('America/La_Paz')->format('Y-m-d');
+
+        // 1. Buscamos el cupón que coincida con el código y esté marcado como activo
+        $cupon = DB::table('cupones')
+            ->where('codigo', $codigoIngresado)
+            ->where('activo', true)
+            ->first();
         
-        if(!$cupon) {
-            return back()->withErrors(['error' => 'Cupón inválido, expirado o inactivo.']);
+        // 2. Si no existe en la base de datos, abortamos de inmediato
+        if (!$cupon) {
+            return back()->withErrors(['error' => 'Cupón inválido, inexistente o inactivo.']);
         }
 
+        // 3. CONTROL TEMPORAL AUTOMÁTICO (PUNTO 8.3 - CAMPÁÑAS TEMPORALES)
+        // Verificamos si la tabla cuenta con la columna 'expira_el' y evaluamos la vigencia por tiempo
+        if (isset($cupon->expira_el) && $cupon->expira_el !== null) {
+            if ($hoy > $cupon->expira_el) {
+                return back()->withErrors(['error' => '🛑 Lo sentimos, este cupón promocional ya ha expirado debido a que la campaña temporal ha finalizado.']);
+            }
+        }
+
+        // 4. Si supera todas las restricciones operativas, se inyecta el descuento en la sesión
         session()->put('descuento', $cupon->descuento_porcentaje);
-        return back()->with('success', '¡Cupón del '.$cupon->descuento_porcentaje.'% aplicado con éxito!');
+        
+        return back()->with('success', '¡Cupón del ' . $cupon->descuento_porcentaje . '% aplicado con éxito a tu carrito!');
     }
 
     public function vaciar()
@@ -115,6 +137,15 @@ class TiendaController extends Controller
             return back()->withErrors(['error' => 'El carrito está vacío.']);
         }
 
+        // Recuperar las matemáticas financieras calculadas en index()
+        $subtotal = 0;
+        foreach($carrito as $item) {
+            $subtotal += $item['precio'] * $item['cantidad'];
+        }
+        $descuento = session()->get('descuento', 0);
+        $monto_descuento = ($subtotal * $descuento) / 100;
+        $totalTienda = $subtotal - $monto_descuento;
+
         DB::beginTransaction();
         try {
             foreach ($carrito as $id => $item) {
@@ -127,6 +158,17 @@ class TiendaController extends Controller
 
                 DB::table('productos')->where('id', $id)->decrement('stock', $item['cantidad']);
             }
+
+            // ====================================================================
+            // ⚡ DISPARADOR AUTOMÁTICO DE NOTIFICACIÓN DE PAGO EN TIENDA (PUNTO 9)
+            // ====================================================================
+            \App\Services\NotificacionService::notificarPagoRegistrado(
+                auth()->id(), 
+                $totalTienda, 
+                "Compra de Productos en Catálogo", 
+                $request->metodo_pago
+            );
+            // ====================================================================
 
             DB::commit();
 

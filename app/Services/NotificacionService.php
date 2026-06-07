@@ -116,27 +116,30 @@ class NotificacionService
         }
     }
 
-    /**
-     * Notificar que está listo para recoger
+   /**
+     * Notificar que la mascota está lista para recoger (PUNTO 9 - INTERFAZ GROOMER)
      */
     public static function notificarListoParaRecoger(Cita $cita)
     {
         $cliente = $cita->cliente;
 
+        // CORRECCIÓN DEL BUG: Usamos comillas dobles "" para permitir la interpolación de variables en PHP
         Notificacion::create([
             'usuario_id' => $cliente->id,
-            'cita_id' => $cita->id,
-            'tipo' => 'recojo',
-            'asunto' => '🐾 ¡{$cita->mascota->nombre} está lista para recoger!',
-            'mensaje' => "¡Listo! El servicio de {$cita->mascota->nombre} ha sido completado exitosamente. Puedes venir a recoger a tu mascota. Fue atendida por {$cita->groomer->name}.",
-            'leida' => false,
+            'cita_id'    => $cita->id,
+            'tipo'       => 'recojo',
+            'asunto'     => "🐾 ¡{$cita->mascota->nombre} está lista para recoger!", // 👈 ¡Luz verde aquí!
+            'mensaje'    => "¡Listo! El servicio de {$cita->mascota->nombre} ha sido completado exitosamente. Puedes venir a recoger a tu mascota. Fue atendida por {$cita->groomer->name}.",
+            'leida'      => false,
         ]);
 
+        // Envío asíncrono del correo electrónico usando la plantilla de recojo
         try {
             Mail::send('emails.notificacion-recojo', ['cita' => $cita], function ($message) use ($cliente) {
                 $message->to($cliente->email)->subject('🐾 ¡Tu mascota está lista para recoger!');
             });
         } catch (\Exception $e) {
+            // Protección del hilo del servidor en caso de desconexión del servicio SMTP
             \Log::error('Error al enviar notificación de recojo: ' . $e->getMessage());
         }
     }
@@ -154,6 +157,44 @@ class NotificacionService
                 'mensaje' => "El insumo '{$insumo->nombre}' ha alcanzado el nivel mínimo de stock. Stock actual: {$insumo->cantidad_disponible} {$insumo->unidad}. Se recomienda reabastecer.",
                 'leida' => false,
             ]);
+        }
+    }
+    /**
+     * Notificar Pago Registrado (PUNTO 9 - Citas y Tienda)
+     */
+    public static function notificarPagoRegistrado($usuarioId, $monto, $concepto, $metodoPago)
+    {
+        // 1. Alerta para el Cliente (o el usuario que pagó)
+        $notificacionCliente = Notificacion::create([
+            'usuario_id' => $usuarioId,
+            'tipo'       => 'pago_registrado',
+            'asunto'     => "💵 ¡Pago Recibido con Éxito!",
+            'mensaje'    => "Hemos registrado tu pago de Bs. " . number_format($monto, 2) . " mediante {$metodoPago} por el concepto de: {$concepto}. ¡Gracias por tu preferencia! 😊🐾",
+            'leida'      => false,
+        ]);
+
+        // 2. Alerta para el personal de Recepción y Administración (Rol 1 y 2)
+        $personalCaja = \App\Models\User::whereIn('rol_id', [1, 2])->get();
+        foreach ($personalCaja as $empleado) {
+            Notificacion::create([
+                'usuario_id' => $empleado->id,
+                'tipo'       => 'pago_recepcion',
+                'asunto'     => "💰 Nueva Entrada en Caja: Bs. " . number_format($monto, 2),
+                'mensaje'    => "Se ha procesado un cobro de Bs. " . number_format($monto, 2) . " ({$metodoPago}) por el concepto: {$concepto}.",
+                'leida'      => false,
+            ]);
+        }
+
+        // 3. Opcional: Enviar el correo electrónico de respaldo al cliente si tiene un email activo
+        try {
+            $cliente = \App\Models\User::find($usuarioId);
+            if ($cliente && $cliente->email) {
+                Mail::raw("Hola {$cliente->name}, te confirmamos que hemos recibido tu pago de Bs. " . number_format($monto, 2) . " por concepto de: {$concepto} vía {$metodoPago}.", function ($message) use ($cliente) {
+                    $message->to($cliente->email)->subject('💵 Comprobante de Pago Recibido - Spa Mascotas');
+                });
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error al enviar correo de pago registrado: ' . $e->getMessage());
         }
     }
 }

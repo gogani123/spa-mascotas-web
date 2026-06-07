@@ -77,7 +77,7 @@ class CitaController extends Controller
         $servicio = \App\Models\Servicio::findOrFail($request->servicio_id);
         $mascota  = \App\Models\Mascota::findOrFail($request->mascota_id);
 
-        // 3. ALGORITMO: Calcular duración exacta en base a la mascota (Punto 1 y 2 de la Rúbrica)
+        // 3. ALGORITMO: Calcular duración exacta en base a la mascota (Rúbrica de Duración)
         $duracionTotal = $servicio->duracion_minutos ?? 45; 
 
         // Incremento por tamaño
@@ -116,12 +116,11 @@ class CitaController extends Controller
         }
 
         // ====================================================================
-        // CORRECCIÓN DEFINITIVA: VALIDACIÓN DE SHIFT/TURNO INMUNE A CASING
+        // VALIDACIÓN DE SHIFT/TURNO INMUNE A CASING
         // ====================================================================
         $groomerObj = \App\Models\User::find($request->groomer_id);
         $turnoRaw = $groomerObj->turno ?? 'completo';
 
-        // Convertimos a minúsculas y limpiamos espacios para evitar fallas de tipeo
         $turnoNormalized = strtolower(trim($turnoRaw));
         $horaComparar = \Carbon\Carbon::parse($hora_inicio_str)->format('H:i');
 
@@ -138,9 +137,22 @@ class CitaController extends Controller
         }
         // ====================================================================
 
+        // Determinar el ID del propietario real de la mascota
+        $idCliente = auth()->user()->rol_id == 4 ? auth()->id() : ($mascota->user_id ?? $mascota->cliente_id);
+
+        // Regla de Negocio (Módulo 8.3): Descuento Automatizado de Cliente Frecuente
+        $citasPrevias = \App\Models\Cita::where('cliente_id', $idCliente)->where('estado', 'Completada')->count();
+        $precioCobrar = $servicio->precio;
+        $mensajeFidelidad = '';
+
+        if ($citasPrevias >= 3) {
+            $precioCobrar = $servicio->precio * 0.90;
+            $mensajeFidelidad = ' 🌟 ¡Beneficio de Cliente Frecuente activado! Se aplicó un 10% de descuento automático.';
+        }
+
         // 6. Crear la cita en la base de datos PostgreSQL
-        \App\Models\Cita::create([
-            'cliente_id'  => auth()->user()->rol_id == 4 ? auth()->id() : ($mascota->user_id ?? $mascota->cliente_id),
+        $cita = \App\Models\Cita::create([
+            'cliente_id'  => $idCliente,
             'mascota_id'  => $request->mascota_id,
             'servicio_id' => $request->servicio_id,
             'groomer_id'  => $request->groomer_id,
@@ -148,10 +160,19 @@ class CitaController extends Controller
             'hora_inicio' => $hora_inicio_str,
             'hora_fin'    => $hora_fin_str,
             'estado'      => auth()->user()->rol_id == 4 ? 'Pendiente' : 'Confirmada', 
-            'total'       => $servicio->precio, 
+            'total'       => $precioCobrar, 
         ]);
 
-        return redirect()->route('citas.index')->with('success', '📅 ¡Cita agendada correctamente! El sistema calculó el espacio de tiempo necesario de forma automática.');
+        // ====================================================================
+        // ⚡ NUEVO DISPARADOR: AUTOMATIZACIÓN DE MENSAJERÍA (PUNTO 9)
+        // ====================================================================
+        // Si la cita fue solicitada por un Cliente por autogestión web, se le notifica que entró en revisión
+        if (auth()->user()->rol_id == 4) {
+            \App\Services\NotificacionService::notificarSolicitudEnRevision($cita);
+        }
+        // ====================================================================
+
+        return redirect()->route('citas.index')->with('success', '📅 ¡Cita agendada correctamente! El sistema calculó el espacio de tiempo necesario de forma automática.' . $mensajeFidelidad);
     }
     
     // MÓDULO DE COBRANZA (PUNTO 3.1)
@@ -163,15 +184,39 @@ class CitaController extends Controller
     public function pagar(Request $request, Cita $cita)
     {
         $request->validate([
-            'metodo_pago' => 'required|string',
+            'metodo_pago' => 'required|string|in:Efectivo,QR,Transferencia',
+            'descuento_manual' => 'nullable|numeric|min:0',
         ]);
+
+        $descuentoManual = $request->input('descuento_manual', 0);
+
+        if ($descuentoManual > $cita->total) {
+            return back()->withInput()->withErrors([
+                'descuento_manual' => '🛑 Error operativo: El descuento no puede ser superior al costo del servicio.'
+            ]);
+        }
+
+        $totalDefinitivo = $cita->total - $descuentoManual;
 
         $cita->update([
             'estado_pago' => 'Pagado',
             'metodo_pago' => $request->metodo_pago,
+            'total'       => $totalDefinitivo, 
         ]);
 
-        return redirect()->route('citas.index')->with('success', '¡Pago de ' . $cita->cliente->name . ' registrado correctamente por ' . $request->metodo_pago . '!');
+        // ====================================================================
+        // ⚡ DISPARADOR AUTOMÁTICO DE NOTIFICACIÓN DE PAGO (PUNTO 9)
+        // ====================================================================
+        $conceptoServicio = "Servicio de Grooming para " . $cita->mascota->nombre;
+        \App\Services\NotificacionService::notificarPagoRegistrado(
+            $cita->cliente_id, 
+            $totalDefinitivo, 
+            $conceptoServicio, 
+            $request->metodo_pago
+        );
+        // ====================================================================
+
+        return redirect()->route('citas.index')->with('success', '¡Pago registrado correctamente!');
     }
 
     // CALENDARIO INTERACTIVO (PUNTO 3.1)
@@ -216,12 +261,22 @@ class CitaController extends Controller
 
     public function aprobar(Cita $cita)
     {
+        // 1. Validar la seguridad operativa del rol que intenta aprobar
         if (Auth::user()->rol_id == 4) {
-            return redirect()->back()->withErrors(['error' => 'Acceso denegado. Solo Recepción puede aprobar citas.']);
+            return redirect()->back()->withErrors(['error' => 'Acceso denegado. Solo el personal de Recepción o Administración puede confirmar citas.']);
         }
 
+        // 2. Cambiar el estado de la cita en la base de datos
         $cita->update(['estado' => 'Confirmada']);
-        return redirect()->back()->with('success', '¡Cita de ' . $cita->mascota->nombre . ' aprobada correctamente!');
+
+        // ====================================================================
+        // ⚡ NUEVO DISPARADOR AUTOMÁTICO: CONFIRMACIÓN EN TIEMPO REAL (PUNTO 9)
+        // ====================================================================
+        // Invocamos el servicio para guardar la alerta y despachar el correo electrónico de inmediato
+        \App\Services\NotificacionService::notificarCitaConfirmada($cita);
+        // ====================================================================
+
+        return redirect()->back()->with('success', '¡Cita de ' . $cita->mascota->nombre . ' aprobada correctamente! Se ha enviado una notificación de confirmación al cliente.');
     }
 
     // app/Http/Controllers/CitaController.php

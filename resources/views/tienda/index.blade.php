@@ -109,6 +109,7 @@
                     </div>
                 </div>
 
+                {{-- BARRA LATERAL: MI CARRITO Y TOTALES FINANCIEROS (PUNTO 8.2) --}}
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 shadow h-fit sticky top-6">
                     <h3 class="text-xl font-bold text-emerald-400 border-b border-gray-700 pb-2 mb-4">🛒 Mi Carrito</h3>
                     
@@ -125,12 +126,46 @@
                             @endforeach
                         </div>
 
-                        <form style="display:inline" method="POST" action="{{ route('tienda.vaciar') }}">
-                            @csrf
-                            <button type="submit" class="w-full py-2 bg-red-900/40 hover:bg-red-800 text-red-300 font-medium rounded shadow transition text-xs uppercase">
-                                🗑️ Vaciar Carrito
+                        {{-- SECCIÓN DE TRABAJO FINANCIERO ADICIONADA (SUBTOTAL, DESCUENTOS Y TOTAL GENERAL) --}}
+                        <div class="border-t border-gray-700 pt-4 mb-6 space-y-2 text-sm text-gray-300">
+                            <div class="flex justify-between">
+                                <span>Subtotal Parcial:</span>
+                                <span class="font-mono font-bold text-gray-100">Bs. {{ number_format($subtotal, 2) }}</span>
+                            </div>
+                            @if(isset($descuento) && $descuento > 0)
+                                <div class="flex justify-between text-amber-400 font-medium">
+                                    <span>Cupón Aplicado ({{ $descuento }}%):</span>
+                                    <span class="font-mono">- Bs. {{ number_format($monto_descuento, 2) }}</span>
+                                </div>
+                            @endif
+                            <div class="flex justify-between text-base font-black text-white border-t border-dashed border-gray-700 pt-2">
+                                <span>Total a Pagar:</span>
+                                <span class="font-mono text-emerald-400">Bs. {{ number_format($total, 2) }}</span>
+                            </div>
+                        </div>
+
+                        {{-- BOTONES DE ACCIÓN COMPLETOS PARA LA INTERFAZ --}}
+                        <div class="space-y-3">
+                            {{-- BOTÓN COMPLETADO DE WHATSAPP --}}
+                            <button type="button" onclick="enviarWhatsApp()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded shadow transition text-xs uppercase tracking-wider text-center block">
+                                💬 Enviar Pedido por WhatsApp
                             </button>
-                        </form>
+
+                            <form method="POST" action="{{ route('tienda.comprar') }}">
+                                @csrf
+                                <input type="hidden" name="metodo_pago" value="Efectivo">
+                                <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded shadow transition text-xs uppercase tracking-wider">
+                                    💵 Registrar Venta Presencial
+                                </button>
+                            </form>
+
+                            <form method="POST" action="{{ route('tienda.vaciar') }}" class="pt-2 text-center">
+                                @csrf
+                                <button type="submit" class="text-xs text-red-400 hover:text-red-300 underline uppercase tracking-wide">
+                                    🗑️ Vaciar Carrito
+                                </button>
+                            </form>
+                        </div>
                     @else
                         <div class="text-center py-8">
                             <p class="text-gray-500 text-sm">Tu carrito está vacío.</p>
@@ -142,10 +177,36 @@
         </div>
     </div>
 
+    {{-- INTERPRETACIÓN DINÁMICA DEL PEDIDO HACIA MENSAJERÍA AUTOMÁTICA --}}
     <script>
         function enviarWhatsApp() {
-            let mensaje = "🐾 *NUEVO PEDIDO - SPA MASCOTAS* 🐾\n\n";
-            let numeroSpa = "59170000000"; 
+            // Mapeamos de forma nativa e inmune los datos que procesó PHP en la sesión
+            let carrito = @json($carrito);
+            let subtotal = "{{ number_format($subtotal, 2) }}";
+            let descuento = "{{ $descuento ?? 0 }}";
+            let montoDescuento = "{{ number_format($monto_descuento ?? 0, 2) }}";
+            let total = "{{ number_format($total, 2) }}";
+            
+            let mensaje = "🐾 *NUEVO PEDIDO - SPA MASCOTAS* 🐾\n";
+            mensaje += "========================================\n\n";
+            
+            // Recorremos los ítems y estructuramos el bloque de texto plano para WhatsApp
+            Object.keys(carrito).forEach(function(key) {
+                let item = carrito[key];
+                let itemTotal = (item.precio * item.cantidad).toFixed(2);
+                mensaje += `📦 *${item.nombre}*\n`;
+                mensaje += `   ${item.cantidad}x Bs. ${parseFloat(item.precio).toFixed(2)}  =  *Bs. ${itemTotal}*\n\n`;
+            });
+            
+            mensaje += "========================================\n";
+            mensaje += `🔹 *Subtotal:* Bs. ${subtotal}\n`;
+            if (parseInt(descuento) > 0) {
+                mensaje += `🔸 *Descuento (${descuento}%):* - Bs. ${montoDescuento}\n`;
+            }
+            mensaje += `💰 *TOTAL GENERAL:* Bs. ${total}\n\n`;
+            mensaje += "Por favor, confírmenme el pedido para proceder con la entrega. ¡Muchas gracias! 😊";
+
+            let numeroSpa = "59170000000"; // Número por defecto para Bolivia (Prefijo 591)
             window.open("https://api.whatsapp.com/send?phone=" + numeroSpa + "&text=" + encodeURIComponent(mensaje), '_blank');
         }
     </script>
