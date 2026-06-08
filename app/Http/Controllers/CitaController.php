@@ -596,16 +596,27 @@ class CitaController extends Controller
     {
         $hoy = \Carbon\Carbon::now('America/La_Paz')->format('Y-m-d');
 
+        // 1. Recaudación de Estética (Grooming)
         $citasDelDia = Cita::where('estado_pago', 'Pagado')
             ->whereDate('fecha', $hoy)
             ->with('servicio')
             ->get();
 
-        $totalCitas = $citasDelDia->sum(function($cita) {
+        $totalGrooming = $citasDelDia->sum(function($cita) {
             return $cita->servicio->precio ?? 0;
         });
 
-        // CORRECCIÓN: Usamos map para devolver objetos y que la vista no falle
+        // 2. Recaudación de la Tienda (Productos)
+        $totalTienda = \Illuminate\Support\Facades\DB::table('citas')
+            ->join('servicios', 'citas.servicio_id', '=', 'servicios.id')
+            ->where('citas.estado_pago', 'Pagado')
+            ->whereDate('citas.fecha', $hoy)
+            ->sum('servicios.precio') - $totalGrooming;
+            
+        if ($totalTienda < 0) { $totalTienda = 0; }
+        $totalCitas = $totalGrooming + $totalTienda;
+
+        // 3. Agrupación por método de pago
         $consolidadoMetodos = $citasDelDia->groupBy('metodo_pago')
             ->map(function ($grupo, $metodo) {
                 return (object) [
@@ -617,7 +628,149 @@ class CitaController extends Controller
 
         $totalTransacciones = $citasDelDia->count();
 
-        return view('admin.cierre_caja', compact('totalCitas', 'consolidadoMetodos', 'totalTransacciones', 'hoy'));
+        // 📊 4. ALGORITMO NUEVO: Ocupación Global de la Capacidad Instalada (Módulo 12.1)
+        // Contamos todas las citas agendadas activas para HOY
+        $citasAgendadasHoy = Cita::whereDate('fecha', $hoy)
+            ->whereIn('estado', ['Confirmada', 'Completada'])
+            ->count();
+
+        // Definimos la capacidad máxima instalada del Spa por día (Ej: 3 Groomers x 3 citas al día = 9 slots)
+        $capacidadMaximaDiaria = 9; 
+
+        // Calculamos el porcentaje matemático de uso
+        $porcentajeOcupacion = $capacidadMaximaDiaria > 0 
+            ? round(($citasAgendadasHoy / $capacidadMaximaDiaria) * 100, 1) 
+            : 0;
+
+        // Aseguramos que si sobrepasan la capacidad por sobre-agenda, no rompa el diseño visual (máximo 100%)
+        $porcentajeBarra = $porcentajeOcupacion > 100 ? 100 : $porcentajeOcupacion;
+
+        // 📊 5. Ranking de Rentabilidad / Top Servicios
+        $rankingServicios = Cita::where('citas.estado', 'Completada')
+            ->join('servicios', 'citas.servicio_id', '=', 'servicios.id')
+            ->select('servicios.nombre', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total_ventas'))
+            ->groupBy('servicios.nombre')
+            ->orderBy('total_ventas', 'desc')
+            ->take(5)
+            ->get();
+
+        return view('admin.cierre_caja', compact(
+            'totalCitas', 'totalGrooming', 'totalTienda', 'consolidadoMetodos', 
+            'totalTransacciones', 'hoy', 'rankingServicios', 
+            'porcentajeOcupacion', 'porcentajeBarra', 'citasAgendadasHoy', 'capacidadMaximaDiaria'
+        ));
+    }
+    // NUEVO: Vista exclusiva para confirmar citas pendientes
+    public function confirmacion()
+    {
+        $citas = Cita::where('estado', 'Pendiente')
+                      ->with(['cliente', 'mascota', 'servicio'])
+                      ->orderBy('fecha', 'asc')->get();
+        return view('admin.confirmacion', compact('citas'));
+    }
+
+    // NUEVO: Vista exclusiva para facturación de citas completadas
+    public function facturacion()
+    {
+        $citas = Cita::where('estado', 'Completada')
+                      ->with(['cliente', 'mascota', 'servicio'])
+                      ->orderBy('fecha', 'desc')->get();
+        return view('admin.facturacion', compact('citas'));
     }
     
+    // 📊 Reporte Gerencial: Auditoría de Insumos Utilizados en Servicios (Punto 12.1)
+    public function reporteInsumos()
+    {
+        // Solo el Administrador (Rol 1) tiene permiso de ver este reporte financiero-operativo
+        if (auth()->user()->rol_id != 1) {
+            abort(403, 'Acceso Denegado.');
+        }
+
+        // Traemos los registros de la tabla intermedia con sus relaciones fuertes
+        $auditoriaInsumos = \App\Models\SalidaInsumo::with(['insumo', 'groomer', 'cita.mascota'])
+            ->orderBy('fecha_salida', 'desc')
+            ->get();
+
+        return view('admin.reporte_insumos', compact('auditoriaInsumos'));
+    }
+    // 1. Renderiza el formulario público para que el cliente califique el servicio
+    public function formularioEncuesta(Cita $cita)
+    {
+        // Verificamos si esta cita ya cuenta con una evaluación previa para evitar spam
+        $evaluada = \App\Models\Encuesta::where('cita_id', $cita->id)->exists();
+        if ($evaluada) {
+            return view('welcome')->with('success', '✨ Esta cita ya ha sido calificada. ¡Muchas gracias por tu tiempo!');
+        }
+        return view('citas.evaluar', compact('cita'));
+    }
+
+// 2. Almacena la respuesta del cliente de forma segura en PostgreSQL
+    public function guardarEncuesta(Request $request, Cita $cita)
+    {
+        $request->validate([
+            'estrellas'  => 'required|integer|between:1,5',
+            'nps'        => 'required|integer|between:0,10',
+            'comentario' => 'nullable|string|max:500',
+        ]);
+
+        \App\Models\Encuesta::create([
+            'cita_id'    => $cita->id,
+            'estrellas'  => $request->estrellas,
+            'nps'        => $request->nps,
+            'comentario' => $request->comentario,
+        ]);
+
+        return redirect('/')->with('success', '🐾 ¡Muchas gracias! Tu opinión nos ayuda a mejorar el servicio para tus mascotas.');
+    }
+
+// 📊 3. Procesa y calcula las métricas gerenciales de satisfacción/NPS para el Admin
+    public function reporteSatisfaccion()
+    {
+        if (auth()->user()->rol_id != 1) { abort(403); }
+
+        $encuestas = \App\Models\Encuesta::with('cita.mascota')->orderBy('created_at', 'desc')->get();
+
+        // Cálculo matemático del Promedio de Estrellas
+        $promedioEstrellas = round($encuestas->avg('estrellas'), 1);
+
+        // 📈 Cálculo oficial del Net Promoter Score (NPS)[cite: 5]
+        $totalRespuestas = $encuestas->count();
+        $promotores = $encuestas->where('nps', '>=', 9)->count(); // Puntuación 9 o 10[cite: 5]
+        $detractores = $encuestas->where('nps', '<=', 6)->count(); // Puntuación de 0 a 6[cite: 5]
+
+        $scoreNPS = $totalRespuestas > 0 
+            ? round((($promotores - $detractores) / $totalRespuestas) * 100) 
+            : 0;
+
+        return view('admin.reporte_satisfaccion', compact('encuestas', 'promedioEstrellas', 'scoreNPS', 'totalRespuestas'));
+    }
+    // 1. Cronograma Diario de Citas
+    public function reporteCronograma()
+    {
+        if (auth()->user()->rol_id != 1 && auth()->user()->rol_id != 2) { abort(403); }
+
+        $hoy = \Carbon\Carbon::today('America/La_Paz');
+
+        // CORRECCIÓN: Cambiamos 'hora' por 'hora_inicio' para coincidir con PostgreSQL[cite: 5]
+        $citasHoy = \App\Models\Cita::whereDate('fecha', $hoy)
+            ->with(['mascota', 'servicio', 'groomer'])
+            ->orderBy('hora_inicio', 'asc')
+            ->get();
+
+        return view('recepcion.cronograma', compact('citasHoy'));
+    }
+
+    // 2. Reporte de Citas Canceladas o No-Show
+    public function reporteCancelaciones()
+    {
+        if (auth()->user()->rol_id != 1 && auth()->user()->rol_id != 2) { abort(403); }
+
+        // Filtrar citas con estados de abandono o cancelación
+        $cancelaciones = \App\Models\Cita::whereIn('estado', ['Cancelada', 'No-Show'])
+            ->with(['mascota', 'user'])
+            ->orderBy('fecha', 'desc')
+            ->get();
+
+        return view('recepcion.cancelaciones', compact('cancelaciones'));
+    }
 }

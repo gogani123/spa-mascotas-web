@@ -205,4 +205,16 @@ class InventarioController extends Controller
 
         return back()->with('success', "✅ Se agregaron {$validated['cantidad']} unidades de '{$insumo->nombre}'");
     }
+    // 3. Reporte de Inventario Crítico
+    public function reporteCritico()
+    {
+        if (auth()->user()->rol_id != 1 && auth()->user()->rol_id != 2) { abort(403); }
+
+        // CORRECCIÓN DEFINITIVA: Usamos tus columnas reales 'cantidad_disponible' y 'cantidad_minima'
+        $insumosCriticos = \App\Models\Insumo::whereRaw('cantidad_disponible <= cantidad_minima')
+            ->orderBy('cantidad_disponible', 'asc')
+            ->get();
+
+        return view('recepcion.inventario_critico', compact('insumosCriticos'));
+    }
 }

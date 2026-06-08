@@ -311,23 +311,67 @@ class GroomerController extends Controller
         ];
     }
     public function registrarSalida(Request $request, $citaId)
-{
-    // Validamos datos básicos
-    $request->validate([
-        'insumo_id' => 'required|exists:insumos,id',
-        'cantidad_entregada' => 'required|integer|min:1',
-    ]);
+    {
+        // Validamos datos básicos
+        $request->validate([
+            'insumo_id' => 'required|exists:insumos,id',
+            'cantidad_entregada' => 'required|integer|min:1',
+        ]);
 
-    // Creamos el registro de salida (Punto 7.1 del documento)
-    \App\Models\SalidaInsumo::create([
-        'cita_id' => $citaId,
-        'insumo_id' => $request->insumo_id,
-        'groomer_id' => auth()->id(), // Groomer responsable
-        'cantidad_entregada' => $request->cantidad_entregada,
-        'estado' => 'Entregado', // Estado inicial según documento
-        'fecha_salida' => now(),
-    ]);
+        // Creamos el registro de salida (Punto 7.1 del documento)
+        \App\Models\SalidaInsumo::create([
+            'cita_id' => $citaId,
+            'insumo_id' => $request->insumo_id,
+            'groomer_id' => auth()->id(), // Groomer responsable
+            'cantidad_entregada' => $request->cantidad_entregada,
+            'estado' => 'Entregado', // Estado inicial según documento
+            'fecha_salida' => now(),
+        ]);
 
-    return back()->with('success', 'Insumo registrado con éxito.');
-}
+        return back()->with('success', 'Insumo registrado con éxito.');
+    }
+    public function reporteRendimiento()
+    {
+        // Forzar que solo el rol de Groomer (3) acceda a su propia analítica
+        if (auth()->user()->rol_id != 3) {
+            abort(403, 'Acceso Restringido.');
+        }
+
+        $groomerId = auth()->id();
+
+        // 1. PRODUCTIVIDAD INDIVIDUAL: Servicios completados y cálculo de tiempo promedio
+        $serviciosCompletados = \App\Models\Cita::where('groomer_id', $groomerId)
+            ->where('estado', 'Completada')
+            ->with('servicio')
+            ->get();
+
+        $totalServicios = $serviciosCompletados->count();
+
+        // Calculamos el tiempo promedio base parametrizado en minutos[cite: 1, 4]
+        $tiempoPromedio = $totalServicios > 0 
+            ? round($serviciosCompletados->avg('servicio.duracion_base'), 1) 
+            : 0;
+
+        // 2. HISTORIAL DE SERVICIOS: Fichas cerradas con observaciones y fotos[cite: 4, 5]
+        $fichasCerradas = \App\Models\FichaGrooming::join('citas', 'fichas_grooming.cita_id', '=', 'citas.id')
+            ->where('citas.groomer_id', $groomerId)
+            ->where('citas.estado', 'Completada')
+            ->select('fichas_grooming.*', 'citas.fecha')
+            ->with('cita.mascota')
+            ->orderBy('citas.fecha', 'desc')
+            ->get();
+
+        // 3. CONSUMO DE INSUMOS: Suministros entregados y utilizados en su jornada[cite: 4, 5]
+        $consumoInsumos = \App\Models\SalidaInsumo::where('groomer_id', $groomerId)
+            ->with('insumo')
+            ->orderBy('fecha_salida', 'desc')
+            ->get();
+
+        return view('groomer.reporte_rendimiento', compact(
+            'totalServicios', 
+            'tiempoPromedio', 
+            'fichasCerradas', 
+            'consumoInsumos'
+        ));
+    }
 }
